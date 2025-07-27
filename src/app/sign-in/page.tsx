@@ -7,11 +7,6 @@ import Image from "next/image";
 
 const LoginPage = () => {
     return (
-
-        
-
-
-
         <div className="flex items-center justify-center min-h-screen w-full p-4 sm:p-6 lg:p-8 bg-gray-100">
             <div className="bg-white p-8 sm:p-10 rpunded-xl shadow-lg w-full max-w-md border border-gray-200">
                 <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">เข้าสู่ระบบ</h2>
@@ -47,7 +42,7 @@ const LoginPage = () => {
                             <input type="checkbox" className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"/>
                             <span className="ml-2">จดจำฉันไว้</span>
                         </label>
-                        <a href="/admin" className="text-blue-600 hover:text-blue-800 text-sm font-medium transition duration-200 ease-in-out">ลืมรหัสผ่าน</a>
+                        <a href="/" className="text-blue-600 hover:text-blue-800 text-sm font-medium transition duration-200 ease-in-out">ลืมรหัสผ่าน</a>
                     </div>
                     <button
                     type="submit"

@@ -31,8 +31,8 @@ const menuItems = [
         visible: ["admin", "user"],
       },
       {
-        icon: "/subject.png",
-        label: "Tenants",
+        icon: "/income.png",
+        label: "Income and Expenses",
         href: "/tenants",
         visible: ["admin"],
       },
@@ -74,7 +74,7 @@ const menuItems = [
       {
         icon: "/logout.png",
         label: "Logout",
-        href: "/logout",
+        href: "/sign-in",
         visible: ["admin", "user",],
       },
     ],
