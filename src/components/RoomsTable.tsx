@@ -120,7 +120,7 @@ const RoomsTable: React.FC<RoomsTableProps> = ({ initialRooms }) => {
       // room_id ไม่จำเป็นต้องอยู่ใน formData สำหรับฟอร์มแก้ไข
       room_num: room.room_num,
       room_status: getRoomStatusValueForForm(room.room_status), // ใช้ helper function เพื่อให้ค่าตรงกับ option value ใน select
-      room_price: room.room_price,
+      room_price: Number(room.room_price),
     });
     setShowForm(true);
   };
