@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, FormEvent } from 'react';
 import { User, UserFormData } from '@/types/user';
-import { createUser, updateUser, deleteUser } from '@/lib/api'; // Import CRUD functions
+import { createUser, updateUser, deleteUser } from '@/lib/api';
 
 interface TableProps {
   initialUsers: User[];
@@ -22,16 +22,18 @@ const Table: React.FC<TableProps> = ({ initialUsers }) => {
     user_tel: '',
     user_address: '',
     user_age: 0,
-    role: '',
-    user_password: '', // *** มี password ใน initial state แล้ว
+    user_password: '',
   });
 
-  // อัปเดต State เมื่อ initialUsers เปลี่ยน (เช่น หลังการสร้าง/แก้ไข/ลบแล้ว revalidate data)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState<string>('');
+
   useEffect(() => {
     setUsers(initialUsers);
   }, [initialUsers]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -46,22 +48,16 @@ const Table: React.FC<TableProps> = ({ initialUsers }) => {
 
     try {
       if (editingUser) {
-        // สำหรับการแก้ไข: ไม่จำเป็นต้องส่ง password ไปถ้า Backend ไม่ได้คาดหวังให้เปลี่ยน password ผ่าน endpoint นี้
-        // หาก Backend ต้องการให้ส่ง password หรือต้องการช่องเปลี่ยน password แยกต่างหาก
-        // คุณอาจจะต้องจัดการ formData.password ให้เป็น optional หรือลบออกก่อนส่ง
         const updatedUser = await updateUser(editingUser.user_id, formData);
         if (updatedUser) {
           setUsers(users.map(u => (u.user_id === updatedUser.user_id ? updatedUser : u)));
-          console.log('User updated:', updatedUser);
         } else {
           throw new Error('Failed to update user.');
         }
       } else {
-        // สำหรับการสร้าง: ส่ง password ไปด้วย
         const newUser = await createUser(formData);
         if (newUser) {
           setUsers([...users, newUser]);
-          console.log('User created:', newUser);
         } else {
           throw new Error('Failed to create user.');
         }
@@ -69,10 +65,9 @@ const Table: React.FC<TableProps> = ({ initialUsers }) => {
       setShowForm(false);
       setEditingUser(null);
       resetForm();
-      router.refresh
+      router.refresh();
     } catch (err: any) {
-      console.error('Submit error:', err);
-      setError(err.message || 'An error occurred during submission.');
+      setError(err.message || 'เกิดข้อผิดพลาด');
     } finally {
       setLoading(false);
     }
@@ -86,9 +81,7 @@ const Table: React.FC<TableProps> = ({ initialUsers }) => {
       user_tel: user.user_tel,
       user_address: user.user_address,
       user_age: user.user_age,
-      role: user.role,
-      user_password: '', // *** ไม่ต้องใส่ password เดิมลงในฟอร์มแก้ไข (เพื่อความปลอดภัย) ***
-                    // ผู้ใช้ควรกรอกใหม่ถ้าต้องการเปลี่ยน หรือมีช่องแยกต่างหากสำหรับเปลี่ยนรหัสผ่าน
+      user_password: '',
     });
     setShowForm(true);
   };
@@ -101,14 +94,12 @@ const Table: React.FC<TableProps> = ({ initialUsers }) => {
         const success = await deleteUser(userId);
         if (success) {
           setUsers(users.filter(user => user.user_id !== userId));
-          console.log('User deleted:', userId);
           router.refresh();
         } else {
           throw new Error('Failed to delete user.');
         }
       } catch (err: any) {
-        console.error('Delete error:', err);
-        setError(err.message || 'An error occurred during deletion.');
+        setError(err.message || 'เกิดข้อผิดพลาดในการลบ');
       } finally {
         setLoading(false);
       }
@@ -122,15 +113,61 @@ const Table: React.FC<TableProps> = ({ initialUsers }) => {
       user_tel: '',
       user_address: '',
       user_age: 0,
-      role: '',
-      user_password: '', // *** มี password ใน resetForm แล้ว
+      user_password: '',
     });
     setEditingUser(null);
   };
 
+  const handleResetPassword = (userId: string) => {
+    setResetPasswordUserId(userId);
+    setNewPassword('');
+  };
+
+  const submitResetPassword = async () => {
+    if (!resetPasswordUserId) return;
+    if (!newPassword) {
+      alert('กรุณากรอกรหัสผ่านใหม่');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const updatedUser = await updateUser(resetPasswordUserId, { user_password: newPassword });
+      if (updatedUser) {
+        setUsers(users.map(u => (u.user_id === updatedUser.user_id ? updatedUser : u)));
+        setResetPasswordUserId(null);
+        setNewPassword('');
+      } else {
+        throw new Error('Failed to reset password.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sortUsersByUsername = (users: User[]) => {
+    return [...users].sort((a, b) => {
+      const matchA = a.user_username.match(/([A-Za-z]+)(\d*)/);
+      const matchB = b.user_username.match(/([A-Za-z]+)(\d*)/);
+
+      if (!matchA || !matchB) return 0;
+
+      const [_, lettersA, numA] = matchA;
+      const [__, lettersB, numB] = matchB;
+
+      if (lettersA < lettersB) return sortOrder === 'asc' ? -1 : 1;
+      if (lettersA > lettersB) return sortOrder === 'asc' ? 1 : -1;
+
+      const numberCompare = (parseInt(numA || '0') - parseInt(numB || '0'));
+      return sortOrder === 'asc' ? numberCompare : -numberCompare;
+    });
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-md mt-8">
-
       <button
         onClick={() => { setShowForm(true); resetForm(); }}
         className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-4"
@@ -142,56 +179,37 @@ const Table: React.FC<TableProps> = ({ initialUsers }) => {
         <div className="mb-6 p-4 border rounded-lg bg-gray-50">
           <h3 className="text-xl font-semibold mb-3">{editingUser ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้'}</h3>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Input fields as per your UserFormData type */}
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="user_name">ชื่อ:</label>
-              <input type="text" id="user_name" name="user_name" value={formData.user_name} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required />
+              <input type="text" id="user_name" name="user_name" value={formData.user_name} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" required />
             </div>
             <div>
-              <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="user_username">ชื่อผู้ใช้ (Username):</label>
-              <input type="text" id="user_username" name="user_username" value={formData.user_username} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required />
+              <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="user_username">Username:</label>
+              <input type="text" id="user_username" name="user_username" value={formData.user_username} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" required />
             </div>
             <div>
-              <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="user_tel">เบอร์โทรศัพท์:</label>
-              <input type="text" id="user_tel" name="user_tel" value={formData.user_tel} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required />
+              <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="user_tel">เบอร์โทร:</label>
+              <input type="text" id="user_tel" name="user_tel" value={formData.user_tel} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" required />
             </div>
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="user_address">ที่อยู่:</label>
-              <input type="text" id="user_address" name="user_address" value={formData.user_address} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required />
+              <input type="text" id="user_address" name="user_address" value={formData.user_address} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" required />
             </div>
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="user_age">อายุ:</label>
-              <input type="number" id="user_age" name="user_age" value={formData.user_age} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required />
+              <input type="number" id="user_age" name="user_age" value={formData.user_age} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" required />
             </div>
-            <div>
-              <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="role">บทบาท:</label>
-              <select id="role" name="role" value={formData.role} onChange={handleInputChange} className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                <option value="">เลือกบทบาท</option>
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            {/* *** เพิ่มช่องกรอก Password ตรงนี้ *** */}
-            {/* โดยทั่วไป password จะมีแค่ตอนสร้างหรือเปลี่ยนรหัสผ่าน ไม่ใช่ตอนแก้ไขข้อมูลทั่วไป */}
-            {!editingUser && ( // แสดงเฉพาะตอนเพิ่มผู้ใช้ใหม่
+            {!editingUser && (
               <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">รหัสผ่าน:</label>
-                <input
-                  type="password" // ใช้ type="password" เพื่อซ่อนตัวอักษร
-                  id="user_password"
-                  name="user_password"
-                  value={formData.user_password}
-                  onChange={handleInputChange}
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                  required // ให้เป็น field ที่ต้องกรอก
-                />
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="user_password">รหัสผ่าน:</label>
+                <input type="password" id="user_password" name="user_password" value={formData.user_password} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" required />
               </div>
             )}
             <div className="md:col-span-2 flex justify-end gap-2 mt-4">
-              <button type="submit" className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50" disabled={loading}>
+              <button type="submit" className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" disabled={loading}>
                 {loading ? 'กำลังบันทึก...' : (editingUser ? 'บันทึกการแก้ไข' : 'เพิ่มผู้ใช้')}
               </button>
-              <button type="button" onClick={() => { setShowForm(false); resetForm(); }} className="bg-gray-400 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" disabled={loading}>
+              <button type="button" onClick={() => { setShowForm(false); resetForm(); }} className="bg-gray-400 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded" disabled={loading}>
                 ยกเลิก
               </button>
             </div>
@@ -200,7 +218,6 @@ const Table: React.FC<TableProps> = ({ initialUsers }) => {
         </div>
       )}
 
-      {/* User List Table */}
       {users.length === 0 && !loading && !error ? (
         <p className="text-gray-600">ไม่พบข้อมูลผู้ใช้</p>
       ) : (
@@ -209,37 +226,45 @@ const Table: React.FC<TableProps> = ({ initialUsers }) => {
             <thead>
               <tr className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
                 <th className="py-3 px-6 text-left">ชื่อ</th>
-                <th className="py-3 px-6 text-left">Username</th>
+                <th className="py-3 px-6 text-left cursor-pointer" onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
+                  Username {sortOrder === 'asc' ? '↑' : '↓'}
+                </th>
+                <th className="py-3 px-6 text-left">Password</th>
                 <th className="py-3 px-6 text-left">เบอร์โทร</th>
                 <th className="py-3 px-6 text-left">ที่อยู่</th>
                 <th className="py-3 px-6 text-left">อายุ</th>
-                <th className="py-3 px-6 text-left">บทบาท</th>
                 <th className="py-3 px-6 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="text-gray-600 text-sm font-light">
-              {users.map((user) => (
+              {sortUsersByUsername(users).map(user => (
                 <tr key={user.user_id} className="border-b border-gray-200 hover:bg-gray-50">
                   <td className="py-3 px-6 text-left whitespace-nowrap">{user.user_name}</td>
                   <td className="py-3 px-6 text-left">{user.user_username}</td>
+                  <td className="py-3 px-6 text-left">
+                    {resetPasswordUserId === user.user_id ? (
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={e => setNewPassword(e.target.value)}
+                          placeholder="รหัสผ่านใหม่"
+                          className="shadow appearance-none border rounded py-1 px-2 text-gray-700"
+                        />
+                        <button onClick={submitResetPassword} className="bg-green-500 hover:bg-green-700 text-white px-2 py-1 rounded text-xs">บันทึก</button>
+                        <button onClick={() => setResetPasswordUserId(null)} className="bg-gray-400 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">ยกเลิก</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => handleResetPassword(user.user_id)} className="bg-blue-500 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs">Reset Password</button>
+                    )}
+                  </td>
                   <td className="py-3 px-6 text-left">{user.user_tel}</td>
                   <td className="py-3 px-6 text-left">{user.user_address}</td>
                   <td className="py-3 px-6 text-left">{user.user_age}</td>
-                  <td className="py-3 px-6 text-left">{user.role}</td>
                   <td className="py-3 px-6 text-center">
                     <div className="flex item-center justify-center space-x-2">
-                      <button
-                        onClick={() => handleEdit(user)}
-                        className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-xs"
-                      >
-                        แก้ไข
-                      </button>
-                      <button
-                        onClick={() => handleDelete(user.user_id)}
-                        className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-xs"
-                      >
-                        ลบ
-                      </button>
+                      <button onClick={() => handleEdit(user)} className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-xs">แก้ไข</button>
+                      <button onClick={() => handleDelete(user.user_id)} className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-xs">ลบ</button>
                     </div>
                   </td>
                 </tr>
@@ -254,4 +279,4 @@ const Table: React.FC<TableProps> = ({ initialUsers }) => {
   );
 };
 
-export default Table; // อย่าลืม export Component ด้วย
+export default Table;

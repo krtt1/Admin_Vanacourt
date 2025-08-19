@@ -43,12 +43,6 @@ const menuItems = [
         visible: ["admin", "user"],
       },
       {
-        icon: "/message.png",
-        label: "Messages",
-        href: "/list/messages",
-        visible: ["admin", "user",],
-      },
-      {
         icon: "/announcement.png",
         label: "Announcements",
         href: "/list/announcements",
@@ -59,12 +53,6 @@ const menuItems = [
   {
     title: "OTHER",
     items: [
-      {
-        icon: "/profile.png",
-        label: "Profile",
-        href: "/profile",
-        visible: ["admin", "user",],
-      },
       {
         icon: "/setting.png",
         label: "Settings",

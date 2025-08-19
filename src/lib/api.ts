@@ -2,9 +2,9 @@
 import { revalidatePath } from 'next/cache'; // revalidatePath จะถูกใช้ใน Server Actions แทน
 import { User, UserFormData } from "@/types/user";
 import { Room, RoomFormData } from "@/types/room";
-import { RepairItem, RepairFormData } from "@/types/repair"; // ตรวจสอบว่า import นี้ถูกต้อง
+import { RepairItem, RepairFormData } from "@/types/repair";
 
-const BASE_URL = "http://localhost:5000"; // ตรวจสอบว่านี่คือ Base URL ที่ถูกต้องของ Backend คุณ
+const BASE_URL = "http://localhost:5000"; // Base URL ของ Backend
 
 // --- GET All Functions ---
 
@@ -12,18 +12,14 @@ export async function getAllUsers(): Promise<User[] | null> {
   try {
     const response = await fetch(`${BASE_URL}/users/getall`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       cache: 'no-store',
     });
 
     if (!response.ok) {
       const errorData = await response.json();
       console.error("Failed to fetch users:", response.status, errorData);
-      if (response.status === 404) {
-        return [];
-      }
+      if (response.status === 404) return [];
       throw new Error(`Error fetching users: ${response.statusText}`);
     }
 
@@ -39,18 +35,14 @@ export async function getAllRooms(): Promise<Room[] | null> {
   try {
     const response = await fetch(`${BASE_URL}/rooms/getall`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       cache: 'no-store',
     });
 
     if (!response.ok) {
       const errorData = await response.json();
       console.error("Failed to fetch rooms:", response.status, errorData);
-      if (response.status === 404) {
-        return [];
-      }
+      if (response.status === 404) return [];
       throw new Error(`Error fetching rooms: ${response.statusText}`);
     }
 
@@ -62,31 +54,40 @@ export async function getAllRooms(): Promise<Room[] | null> {
   }
 }
 
-// === NEW: เปลี่ยน getAllRepairLists() เป็น getAllRepairs() และเปลี่ยน Endpoint ===
-export async function getAllRepairs(): Promise<RepairItem[] | null> { // <--- ฟังก์ชันนี้คืออันที่ควรเก็บไว้
+// --- GET All Repairs ---
+export async function getAllRepairs(): Promise<RepairItem[] | null> {
   try {
-    // ใช้ endpoint สำหรับดึงรายการ Repair ทั้งหมด: /Repair/GetAll
-    const response = await fetch(`${BASE_URL}/Repair/GetAll`, { // <--- แก้ไข endpoint ตรงนี้
+    const response = await fetch(`${BASE_URL}/repairs/getall`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       cache: 'no-store',
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error("Failed to fetch repairs:", response.status, errorData); // <--- เปลี่ยนข้อความ Log
-      if (response.status === 404) {
-        return [];
-      }
-      throw new Error(`Error fetching repairs: ${response.statusText}`); // <--- เปลี่ยนข้อความ Error
+      console.error("Failed to fetch repairs:", response.status, errorData);
+      if (response.status === 404) return [];
+      throw new Error(`Error fetching repairs: ${response.statusText}`);
     }
 
-    const repairs: RepairItem[] = await response.json(); // <--- เปลี่ยนชื่อตัวแปรและ Type
+    const data = await response.json();
+    console.log("Raw repairs data:", data);
+
+    const repairs: RepairItem[] = data.map((r: any) => ({
+      ...r,
+      repairlist: r.repairlist
+        ? {
+            repairlist_details: r.repairlist.repairlist_details ?? "",
+            repairlist_price: r.repairlist.repairlist_price != null
+              ? Number(r.repairlist.repairlist_price)
+              : null,
+          }
+        : null,
+    }));
+
     return repairs;
   } catch (error) {
-    console.error("An unexpected error occurred while fetching repairs:", error); // <--- เปลี่ยนข้อความ Log
+    console.error("An unexpected error occurred while fetching repairs:", error);
     return null;
   }
 }
@@ -97,62 +98,52 @@ export async function createUser(userData: UserFormData): Promise<User> {
   try {
     const response = await fetch(`${BASE_URL}/users/register`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(userData),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      const errorMessage = errorData.message || `Error creating user: ${response.statusText}`;
-      console.error("Failed to create user (API Response Error):", response.status, errorData);
-      throw new Error(errorMessage);
+      console.error("Failed to create user:", response.status, errorData);
+      throw new Error(errorData.message || `Error creating user: ${response.statusText}`);
     }
 
     const responseData = await response.json();
-    console.log("Raw response data from API (createUser):", responseData);
-
     if (responseData && responseData.user) {
       return responseData.user as User;
     } else {
-      console.error("API response for user creation did not contain expected 'user' object:", responseData);
       throw new Error("Invalid response format from server for user creation.");
     }
-
   } catch (error: any) {
-    console.error("An unexpected error occurred while creating user (Client-side processing error):", error);
-    throw new Error(error.message || "An unknown error occurred during user creation.");
+    console.error("Error creating user:", error);
+    throw new Error(error.message || "Unknown error during user creation.");
   }
 }
 
 export async function updateUser(userId: string, userData: Partial<UserFormData>): Promise<User> {
   try {
     const dataToSend: Partial<UserFormData> = { ...userData };
-    if ('user_password' in dataToSend && (dataToSend.user_password === '' || dataToSend.user_password === undefined)) {
-        delete dataToSend.user_password;
+    if ('user_password' in dataToSend && !dataToSend.user_password) {
+      delete dataToSend.user_password;
     }
 
     const response = await fetch(`${BASE_URL}/users/${userId}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dataToSend),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      const errorMessage = errorData.message || `Error updating user: ${response.statusText}`;
       console.error("Failed to update user:", response.status, errorData);
-      throw new Error(errorMessage);
+      throw new Error(errorData.message || `Error updating user: ${response.statusText}`);
     }
 
     const updatedUser = await response.json();
     return updatedUser as User;
   } catch (error: any) {
-    console.error("An unexpected error occurred while updating user:", error);
-    throw new Error(error.message || "An unknown error occurred during user update.");
+    console.error("Error updating user:", error);
+    throw new Error(error.message || "Unknown error during user update.");
   }
 }
 
@@ -160,21 +151,18 @@ export async function deleteUser(userId: string): Promise<boolean> {
   try {
     const response = await fetch(`${BASE_URL}/users/${userId}`, {
       method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      const errorMessage = errorData.message || `Error deleting user: ${response.statusText}`;
       console.error("Failed to delete user:", response.status, errorData);
-      throw new Error(errorMessage);
+      throw new Error(errorData.message || `Error deleting user: ${response.statusText}`);
     }
     return true;
   } catch (error: any) {
-    console.error("An unexpected error occurred while deleting user:", error);
-    throw new Error(error.message || "An unknown error occurred during user deletion.");
+    console.error("Error deleting user:", error);
+    throw new Error(error.message || "Unknown error during user deletion.");
   }
 }
 
@@ -182,165 +170,161 @@ export async function deleteUser(userId: string): Promise<boolean> {
 
 export async function createRoom(roomData: RoomFormData): Promise<Room> {
   try {
-    const response = await fetch(`${BASE_URL}/rooms/create`, { // ปรับ endpoint ตาม Backend ของคุณ
+    const response = await fetch(`${BASE_URL}/rooms/create`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(roomData),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      const errorMessage = errorData.message || `Error creating room: ${response.statusText}`;
-      console.error("Failed to create room (API Response Error):", response.status, errorData);
-      throw new Error(errorMessage);
+      console.error("Failed to create room:", response.status, errorData);
+      throw new Error(errorData.message || `Error creating room: ${response.statusText}`);
     }
 
-    const newRoom: Room = await response.json(); // สมมติว่า Backend ส่ง Room object โดยตรง
-    console.log("Raw response data from API (createRoom):", newRoom);
+    const newRoom: Room = await response.json();
     return newRoom;
-
   } catch (error: any) {
-    console.error("An unexpected error occurred while creating room (Client-side processing error):", error);
-    throw new Error(error.message || "An unknown error occurred during room creation.");
+    console.error("Error creating room:", error);
+    throw new Error(error.message || "Unknown error during room creation.");
   }
 }
 
 export async function updateRoom(roomId: string, roomData: Partial<RoomFormData>): Promise<Room> {
   try {
-    const response = await fetch(`${BASE_URL}/rooms/${roomId}`, { // ปรับ endpoint ตาม Backend ของคุณ
+    const response = await fetch(`${BASE_URL}/rooms/${roomId}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(roomData),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      const errorMessage = errorData.message || `Error updating room: ${response.statusText}`;
       console.error("Failed to update room:", response.status, errorData);
-      throw new Error(errorMessage);
+      throw new Error(errorData.message || `Error updating room: ${response.statusText}`);
     }
 
-    const updatedRoom: Room = await response.json(); // สมมติว่า Backend ส่ง Room object โดยตรง
+    const updatedRoom: Room = await response.json();
     return updatedRoom;
   } catch (error: any) {
-    console.error("An unexpected error occurred while updating room:", error);
-    throw new Error(error.message || "An unknown error occurred during room update.");
+    console.error("Error updating room:", error);
+    throw new Error(error.message || "Unknown error during room update.");
   }
 }
 
 export async function deleteRoom(roomId: string): Promise<boolean> {
   try {
-    const response = await fetch(`${BASE_URL}/rooms/${roomId}`, { // ปรับ endpoint ตาม Backend ของคุณ
+    const response = await fetch(`${BASE_URL}/rooms/${roomId}`, {
       method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      const errorMessage = errorData.message || `Error deleting room: ${response.statusText}`;
       console.error("Failed to delete room:", response.status, errorData);
-      throw new Error(errorMessage);
+      throw new Error(errorData.message || `Error deleting room: ${response.statusText}`);
     }
     return true;
   } catch (error: any) {
-    console.error("An unexpected error occurred while deleting room:", error);
-    throw new Error(error.message || "An unknown error occurred during room deletion.");
+    console.error("Error deleting room:", error);
+    throw new Error(error.message || "Unknown error during room deletion.");
   }
 }
 
-// === NEW: CRUD Functions for Repair (เปลี่ยนจาก Repair List เป็น Repair) ===
+// --- CRUD Functions for Repair ---
 
-export async function createRepairItem(repairData: RepairFormData): Promise<RepairItem> { // <--- เปลี่ยนชื่อฟังก์ชันและ Type Return/Parameter
+export async function createRepairItem(repairData: RepairFormData): Promise<RepairItem> {
   try {
-    // ใช้ endpoint สำหรับสร้างรายการ Repair: /Repair/CreateRepair
-    const response = await fetch(`${BASE_URL}/Repair/CreateRepair`, { // <--- แก้ไข endpoint
+    const response = await fetch(`${BASE_URL}/repairs/create`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(repairData), // ส่งข้อมูลตาม RepairFormData
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(repairData),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      const errorMessage = errorData.message || `Error creating repair item: ${response.statusText}`;
-      console.error("Failed to create repair item (API Response Error):", response.status, errorData);
-      throw new Error(errorMessage);
+      console.error("Failed to create repair item:", response.status, errorData);
+      throw new Error(errorData.message || `Error creating repair item: ${response.statusText}`);
     }
 
-    const newRepairItem: RepairItem = await response.json(); // <--- เปลี่ยน Type
-    console.log("Raw response data from API (createRepairItem):", newRepairItem); // <--- เปลี่ยนชื่อ Log
-    return newRepairItem;
+    const r = await response.json();
+    const newRepairItem: RepairItem = {
+      ...r,
+      repairlist: r.repairlist
+        ? {
+            repairlist_details: r.repairlist.repairlist_details ?? "",
+            repairlist_price: r.repairlist.repairlist_price != null
+              ? Number(r.repairlist.repairlist_price)
+              : null,
+          }
+        : null,
+    };
 
+    return newRepairItem;
   } catch (error: any) {
-    console.error("An unexpected error occurred while creating repair item (Client-side processing error):", error);
-    throw new Error(error.message || "An unknown error occurred during repair item creation.");
+    console.error("Error creating repair item:", error);
+    throw new Error(error.message || "Unknown error during repair item creation.");
   }
 }
 
-export async function updateRepairItem(repairId: string, repairData: Partial<RepairFormData>): Promise<RepairItem> { // <--- เปลี่ยนชื่อฟังก์ชันและ Type Return/Parameter
+export async function updateRepairItem(repairId: string, repairData: Partial<RepairFormData>): Promise<RepairItem> {
   try {
-    // ใช้ endpoint สำหรับแก้ไขรายการ Repair: /Repair/Update
-    // ตามภาพ API: รับ ID ผ่าน Request Body
-    const response = await fetch(`${BASE_URL}/Repair/Update`, { // <--- แก้ไข endpoint
+    const response = await fetch(`${BASE_URL}/repairs/update`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ id: repairId, ...repairData }), // <--- ส่ง ID ใน body
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: repairId, ...repairData }),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      const errorMessage = errorData.message || `Error updating repair item: ${response.statusText}`;
       console.error("Failed to update repair item:", response.status, errorData);
-      throw new Error(errorMessage);
+      throw new Error(errorData.message || `Error updating repair item: ${response.statusText}`);
     }
 
-    const updatedRepairItem: RepairItem = await response.json(); // <--- เปลี่ยน Type
+    const r = await response.json();
+    const updatedRepairItem: RepairItem = {
+      ...r,
+      repairlist: r.repairlist
+        ? {
+            repairlist_details: r.repairlist.repairlist_details ?? "",
+            repairlist_price: r.repairlist.repairlist_price != null
+              ? Number(r.repairlist.repairlist_price)
+              : null,
+          }
+        : null,
+    };
+
     return updatedRepairItem;
   } catch (error: any) {
-    console.error("An unexpected error occurred while updating repair item:", error);
-    throw new Error(error.message || "An unknown error occurred during repair item update.");
+    console.error("Error updating repair item:", error);
+    throw new Error(error.message || "Unknown error during repair item update.");
   }
 }
 
-export async function deleteRepairItem(repairId: string): Promise<boolean> { // <--- เปลี่ยนชื่อฟังก์ชัน
+export async function deleteRepairItem(repairId: string): Promise<boolean> {
   try {
-    // ใช้ endpoint สำหรับลบรายการ Repair: /Repair/Delete
-    // ตามภาพ API: รับ ID ผ่าน Request Body
-    const response = await fetch(`${BASE_URL}/Repair/Delete`, { // <--- แก้ไข endpoint
+    const response = await fetch(`${BASE_URL}/repairs/delete`, {
       method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ id: repairId }), // <--- ส่ง ID ใน body
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: repairId }),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      const errorMessage = errorData.message || `Error deleting repair item: ${response.statusText}`;
       console.error("Failed to delete repair item:", response.status, errorData);
-      throw new Error(errorMessage);
+      throw new Error(errorData.message || `Error deleting repair item: ${response.statusText}`);
     }
-    return true; // ลบสำเร็จ
+
+    return true;
   } catch (error: any) {
-    console.error("An unexpected error occurred while deleting repair item:", error);
-    throw new Error(error.message || "An unknown error occurred during repair item deletion.");
+    console.error("Error deleting repair item:", error);
+    throw new Error(error.message || "Unknown error during repair item deletion.");
   }
 }
 
-// === NEW: เพิ่มฟังก์ชัน getRepairItemById() ===
-// (อันนี้คือฟังก์ชัน GetID ที่ควรจะมีอยู่จริง)
 export async function getRepairItemById(repairId: string): Promise<RepairItem | null> {
   try {
-    const response = await fetch(`${BASE_URL}/Repair/GetID?id=${repairId}`, { // <--- Endpoint สำหรับ GetID
+    const response = await fetch(`${BASE_URL}/repairs/get?id=${repairId}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       cache: 'no-store',
@@ -351,10 +335,23 @@ export async function getRepairItemById(repairId: string): Promise<RepairItem | 
       console.error(`Failed to fetch repair item by ID ${repairId}:`, response.status, errorData);
       return null;
     }
-    const repairItem: RepairItem = await response.json();
+
+    const r = await response.json();
+    const repairItem: RepairItem = {
+      ...r,
+      repairlist: r.repairlist
+        ? {
+            repairlist_details: r.repairlist.repairlist_details ?? "",
+            repairlist_price: r.repairlist.repairlist_price != null
+              ? Number(r.repairlist.repairlist_price)
+              : null,
+          }
+        : null,
+    };
+
     return repairItem;
   } catch (error) {
-    console.error(`An unexpected error occurred while fetching repair item by ID ${repairId}:`, error);
+    console.error(`Error fetching repair item by ID ${repairId}:`, error);
     return null;
   }
 }
