@@ -19,6 +19,12 @@ const menuItems = [
         visible: ["admin", "user"],
       },
       {
+        icon: "/payment.png",
+        label: "Stay Management",
+        href: "/stay",
+        visible: ["admin", "user"],
+      },
+      {
         icon: "/student.png",
         label: "User",
         href: "/user",

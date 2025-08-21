@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'; // revalidatePath จะถูก�
 import { User, UserFormData } from "@/types/user";
 import { Room, RoomFormData } from "@/types/room";
 import { RepairItem, RepairFormData } from "@/types/repair";
+import { Stay, StayFormData } from "@/types/stay";
 
 const BASE_URL = "http://localhost:5000"; // Base URL ของ Backend
 
@@ -353,5 +354,97 @@ export async function getRepairItemById(repairId: string): Promise<RepairItem | 
   } catch (error) {
     console.error(`Error fetching repair item by ID ${repairId}:`, error);
     return null;
+  }
+}
+
+// --- GET All Stays ---
+export async function getAllStays(): Promise<Stay[] | null> {
+  try {
+    const response = await fetch(`${BASE_URL}/stays/getall`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: `Failed with status: ${response.status}` }));
+      console.error("Failed to fetch stays:", response.status, errorData);
+      if (response.status === 404) return [];
+      throw new Error(errorData.message || `Error fetching stays: ${response.statusText}`);
+    }
+
+    const stays: Stay[] = await response.json();
+    return stays;
+  } catch (error) {
+    console.error("An unexpected error occurred while fetching stays:", error);
+    return null;
+  }
+}
+
+// --- CRUD Functions for Stay ---
+export async function createStay(stayData: StayFormData): Promise<Stay> {
+  try {
+    const response = await fetch(`${BASE_URL}/stays/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(stayData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: `Failed with status: ${response.status}` }));
+      console.error("Failed to create stay:", response.status, errorData);
+      throw new Error(errorData.message || `Error creating stay: ${response.statusText}`);
+    }
+
+    const newStay: Stay = await response.json();
+    revalidatePath('/stay');
+    return newStay;
+  } catch (error: any) {
+    console.error("Error creating stay:", error);
+    throw new Error(error.message || "Unknown error during stay creation.");
+  }
+}
+
+export async function updateStay(stayId: string, stayData: Partial<StayFormData>): Promise<Stay> {
+  try {
+    const response = await fetch(`${BASE_URL}/stays/${stayId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(stayData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: `Failed with status: ${response.status}` }));
+      console.error("Failed to update stay:", response.status, errorData);
+      throw new Error(errorData.message || `Error updating stay: ${response.statusText}`);
+    }
+
+    const updatedStay: Stay = await response.json();
+    revalidatePath('/stay');
+    return updatedStay;
+  } catch (error: any) {
+    console.error("Error updating stay:", error);
+    throw new Error(error.message || "Unknown error during stay update.");
+  }
+}
+
+export async function deleteStay(stayId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${BASE_URL}/stays/${stayId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: `Failed with status: ${response.status}` }));
+      console.error("Failed to delete stay:", response.status, errorData);
+      throw new Error(errorData.message || `Error deleting stay: ${response.statusText}`);
+    }
+
+    revalidatePath('/stay');
+    return true;
+  } catch (error: any) {
+    console.error("Error deleting stay:", error);
+    throw new Error(error.message || "Unknown error during stay deletion.");
   }
 }

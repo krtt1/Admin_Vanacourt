@@ -3,22 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { Admin } from "@/types/admin";
 
-// กำหนด URL ของ API ที่จะใช้ล็อกอิน
-const API_URL = "http://localhost:5000/admin/login"; // URL ที่ถูกต้อง
+// แก้ไข URL ของ API ให้ตรงกับ Backend
+const API_URL = "http://localhost:5000/admins/login"; // หรืออาจจะเป็น "http://localhost:5000/admin/login"
 
 const LoginPage = () => {
-    // ใช้ useState เพื่อเก็บค่า username และ password
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const router = useRouter();
 
-    // ฟังก์ชันจัดการการล็อกอินเมื่อกดปุ่ม "เข้าสู่ระบบ"
     const handleLogin = async (e) => {
-        e.preventDefault(); // ป้องกันการรีโหลดหน้าเมื่อกดปุ่ม
+        e.preventDefault();
 
-        // ตรวจสอบว่ามีข้อมูลครบถ้วนหรือไม่
         if (!username || !password) {
             setError("โปรดป้อนชื่อผู้ใช้และรหัสผ่าน");
             return;
@@ -36,29 +34,23 @@ const LoginPage = () => {
                 }),
             });
 
-            // ตรวจสอบว่าการเรียก API สำเร็จหรือไม่
             if (response.ok) {
                 const data = await response.json();
                 console.log("Login successful:", data);
-                // Redirect ไปยังหน้า dashboard เมื่อล็อกอินสำเร็จ
-                router.push("/dashboard");
+                router.push("/");
             } else {
-                // ถ้าล็อกอินไม่สำเร็จ ให้แสดงข้อความแจ้งเตือน
-                // เพิ่มการตรวจสอบประเภทของข้อมูลที่ได้รับกลับมา
                 const contentType = response.headers.get("content-type");
                 if (contentType && contentType.includes("application/json")) {
                     const errorData = await response.json();
                     setError(errorData.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
                     console.error("Login failed:", errorData);
                 } else {
-                    // ถ้าไม่ใช่ JSON แสดงว่าเป็น HTML หรือข้อมูลรูปแบบอื่น
                     const errorText = await response.text();
                     setError("เกิดข้อผิดพลาดในการเชื่อมต่อ: กรุณาตรวจสอบการตั้งค่า Backend API");
                     console.error("Login error: Expected JSON, but received HTML. Response text:", errorText);
                 }
             }
         } catch (err) {
-            // ดักจับข้อผิดพลาดที่เกิดขึ้นระหว่างการเชื่อมต่อ
             setError("เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์");
             console.error("Login error:", err);
         }
