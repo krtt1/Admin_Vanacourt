@@ -1,40 +1,64 @@
-"use server"; // ระบุว่าเป็น Server Action
+"use server";
 
-import { createStay, updateStay, deleteStay } from "@/lib/api";
-import { StayFormData } from "@/types/stay";
+import { StayFormData, Stay } from "@/types/stay";
+import { revalidatePath } from "next/cache";
 
-export async function addStayAction(formData: StayFormData) {
+const BASE_URL = "http://localhost:5000";
+
+export async function addStayAction(formData: StayFormData): Promise<{ success: boolean; stay?: Stay; message?: string }> {
   try {
-    console.log("addStayAction: Attempting to create stay...");
-    const newStay = await createStay(formData);
-    console.log("addStayAction: Stay created successfully:", newStay);
-    return { success: true, stay: newStay };
+    const response = await fetch(`${BASE_URL}/stays/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: "Failed to create stay" }));
+      return { success: false, message: errorData.message || "Cannot create stay" };
+    }
+
+    const stay: Stay = await response.json();
+    revalidatePath("/stay");
+    return { success: true, stay };
   } catch (error: any) {
-    console.error("addStayAction: Error creating stay:", error.message);
-    return { success: false, message: error.message || "Failed to create stay." };
+    console.error("addStayAction error:", error);
+    return { success: false, message: error.message || "Unknown error creating stay" };
   }
 }
 
-export async function updateStayAction(stayId: string, formData: Partial<StayFormData>) {
+export async function updateStayAction(stayId: string, formData: Partial<StayFormData>): Promise<{ success: boolean; stay?: Stay; message?: string }> {
   try {
-    console.log(`updateStayAction: Attempting to update stay ${stayId}...`);
-    const updatedStay = await updateStay(stayId, formData);
-    console.log(`updateStayAction: Stay ${stayId} updated successfully:`, updatedStay);
-    return { success: true, stay: updatedStay };
+    const response = await fetch(`${BASE_URL}/stays/${stayId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: "Failed to update stay" }));
+      return { success: false, message: errorData.message || "Cannot update stay" };
+    }
+
+    const stay: Stay = await response.json();
+    revalidatePath("/stay");
+    return { success: true, stay };
   } catch (error: any) {
-    console.error(`updateStayAction: Error updating stay ${stayId}:`, error.message);
-    return { success: false, message: error.message || "Failed to update stay." };
+    console.error("updateStayAction error:", error);
+    return { success: false, message: error.message || "Unknown error updating stay" };
   }
 }
 
-export async function deleteStayAction(stayId: string) {
+export async function deleteStayAction(stayId: string): Promise<{ success: boolean; message?: string }> {
   try {
-    console.log(`deleteStayAction: Attempting to delete stay ${stayId}...`);
-    await deleteStay(stayId);
-    console.log(`deleteStayAction: Stay ${stayId} deleted successfully.`);
+    const response = await fetch(`${BASE_URL}/stays/${stayId}`, { method: "DELETE" });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: "Failed to delete stay" }));
+      return { success: false, message: errorData.message || "Cannot delete stay" };
+    }
+
+    revalidatePath("/stay");
     return { success: true };
   } catch (error: any) {
-    console.error(`deleteStayAction: Error deleting stay ${stayId}:`, error.message);
-    return { success: false, message: error.message || "Failed to delete stay." };
+    console.error("deleteStayAction error:", error);
+    return { success: false, message: error.message || "Unknown error deleting stay" };
   }
 }
