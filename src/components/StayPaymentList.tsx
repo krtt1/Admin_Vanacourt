@@ -1,32 +1,28 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Payment, Stay, PaymentStatus } from "@/types/payment";
-import {
-  getAllPayments,
-  createPaymentAction,
-  updatePaymentAction,
-  deletePaymentAction,
-  getAllBillTypes,
-  getAllStaysForPayment
-} from "@/app/(dashboard)/payment/paymentAction";
+import { Payment, Stay, PaymentStatus, BillType } from "@/types/payment";
+import { getAllPayments, updatePaymentAction, deletePaymentAction, getAllBillTypes } from "@/app/(dashboard)/payment/paymentAction";
 
 interface StayPaymentListProps {
   stay: Stay;
+  adminId: string;
+  adminUsername: string;
   onClose: () => void;
 }
 
-const StayPaymentList = ({ stay, onClose }: StayPaymentListProps) => {
+const StayPaymentList = ({ stay, adminId, adminUsername, onClose }: StayPaymentListProps) => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [billTypes, setBillTypes] = useState<BillType[]>([]);
 
   const fetchPayments = async () => {
     try {
       setLoading(true);
       const allPayments = await getAllPayments();
-      const stayPayments = allPayments.filter((p) => p.stay_id === stay.stay_id);
+      const stayPayments = allPayments.filter(p => p.stay_id === stay.stay_id);
       setPayments(stayPayments);
     } catch (err: any) {
       setError(err.message || "Cannot fetch payments");
@@ -35,28 +31,30 @@ const StayPaymentList = ({ stay, onClose }: StayPaymentListProps) => {
     }
   };
 
+  const fetchBillTypes = async () => {
+    const types = await getAllBillTypes();
+    setBillTypes(types);
+  };
+
   useEffect(() => {
     fetchPayments();
+    fetchBillTypes();
   }, [stay.stay_id]);
 
   const handleDelete = async (paymentId: string) => {
     if (!confirm("คุณต้องการลบบิลนี้หรือไม่?")) return;
     try {
       await deletePaymentAction(paymentId);
-      setPayments((prev) => prev.filter((p) => p.payment_id !== paymentId));
+      setPayments(prev => prev.filter(p => p.payment_id !== paymentId));
     } catch (err: any) {
       alert(err.message || "Cannot delete payment");
     }
   };
 
-  const handleEdit = (payment: Payment) => setEditingPayment(payment);
-
   const handleSaveEdit = async (updatedPayment: Payment) => {
     try {
       await updatePaymentAction(updatedPayment);
-      setPayments((prev) =>
-        prev.map((p) => (p.payment_id === updatedPayment.payment_id ? updatedPayment : p))
-      );
+      setPayments(prev => prev.map(p => p.payment_id === updatedPayment.payment_id ? updatedPayment : p));
       setEditingPayment(null);
     } catch (err: any) {
       alert(err.message || "ไม่สามารถแก้ไขบิลได้");
@@ -83,22 +81,22 @@ const StayPaymentList = ({ stay, onClose }: StayPaymentListProps) => {
             </tr>
           </thead>
           <tbody>
-            {payments.map((p) => (
+            {payments.map(p => (
               <tr key={p.payment_id} className="border-b border-gray-200 hover:bg-gray-50">
                 <td className="py-2 px-3">{p.payment_date}</td>
                 <td className="py-2 px-3">{p.payment_total}</td>
-                <td className="py-2 px-3">{p.payment_status === PaymentStatus.Paid ? "จ่ายแล้ว" : "ยังไม่จ่าย"}</td>
+                <td className="py-2 px-3">
+                  {p.payment_status === PaymentStatus.Paid
+                    ? "จ่ายแล้ว"
+                    : p.payment_status === PaymentStatus.Processing
+                    ? "กำลังดำเนินการ"
+                    : "ยังไม่จ่าย"}
+                </td>
                 <td className="py-2 px-3 text-center">
-                  <button
-                    onClick={() => handleEdit(p)}
-                    className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-2 rounded text-xs mr-2"
-                  >
+                  <button onClick={() => setEditingPayment(p)} className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-2 rounded text-xs mr-2">
                     แก้ไข
                   </button>
-                  <button
-                    onClick={() => handleDelete(p.payment_id)}
-                    className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded text-xs"
-                  >
+                  <button onClick={() => handleDelete(p.payment_id)} className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded text-xs">
                     ลบ
                   </button>
                 </td>
@@ -108,10 +106,7 @@ const StayPaymentList = ({ stay, onClose }: StayPaymentListProps) => {
         </table>
       )}
 
-      <button
-        onClick={onClose}
-        className="mt-3 bg-gray-500 hover:bg-gray-700 text-white py-1 px-3 rounded text-sm"
-      >
+      <button onClick={onClose} className="mt-3 bg-gray-500 hover:bg-gray-700 text-white py-1 px-3 rounded text-sm">
         ปิด
       </button>
 
@@ -125,9 +120,7 @@ const StayPaymentList = ({ stay, onClose }: StayPaymentListProps) => {
               <input
                 type="number"
                 value={editingPayment.water_amount}
-                onChange={(e) =>
-                  setEditingPayment({ ...editingPayment, water_amount: parseFloat(e.target.value) })
-                }
+                onChange={(e) => setEditingPayment({ ...editingPayment, water_amount: parseFloat(e.target.value) })}
                 className="border rounded w-full mt-1 p-1"
               />
             </label>
@@ -136,9 +129,7 @@ const StayPaymentList = ({ stay, onClose }: StayPaymentListProps) => {
               <input
                 type="number"
                 value={editingPayment.ele_amount}
-                onChange={(e) =>
-                  setEditingPayment({ ...editingPayment, ele_amount: parseFloat(e.target.value) })
-                }
+                onChange={(e) => setEditingPayment({ ...editingPayment, ele_amount: parseFloat(e.target.value) })}
                 className="border rounded w-full mt-1 p-1"
               />
             </label>
@@ -147,9 +138,7 @@ const StayPaymentList = ({ stay, onClose }: StayPaymentListProps) => {
               <input
                 type="number"
                 value={editingPayment.other_payment}
-                onChange={(e) =>
-                  setEditingPayment({ ...editingPayment, other_payment: parseFloat(e.target.value) })
-                }
+                onChange={(e) => setEditingPayment({ ...editingPayment, other_payment: parseFloat(e.target.value) })}
                 className="border rounded w-full mt-1 p-1"
               />
             </label>
@@ -157,27 +146,20 @@ const StayPaymentList = ({ stay, onClose }: StayPaymentListProps) => {
               สถานะ:
               <select
                 value={editingPayment.payment_status}
-                onChange={(e) =>
-                  setEditingPayment({ ...editingPayment, payment_status: e.target.value as PaymentStatus })
-                }
+                onChange={(e) => setEditingPayment({ ...editingPayment, payment_status: e.target.value as PaymentStatus })}
                 className="border rounded w-full mt-1 p-1"
               >
                 <option value={PaymentStatus.Unpaid}>ยังไม่จ่าย</option>
+                <option value={PaymentStatus.Processing}>กำลังดำเนินการ</option>
                 <option value={PaymentStatus.Paid}>จ่ายแล้ว</option>
               </select>
             </label>
 
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setEditingPayment(null)}
-                className="bg-gray-500 hover:bg-gray-700 text-white py-1 px-3 rounded"
-              >
+              <button onClick={() => setEditingPayment(null)} className="bg-gray-500 hover:bg-gray-700 text-white py-1 px-3 rounded">
                 ยกเลิก
               </button>
-              <button
-                onClick={() => handleSaveEdit(editingPayment)}
-                className="bg-green-500 hover:bg-green-700 text-white py-1 px-3 rounded"
-              >
+              <button onClick={() => handleSaveEdit(editingPayment)} className="bg-green-500 hover:bg-green-700 text-white py-1 px-3 rounded">
                 บันทึก
               </button>
             </div>

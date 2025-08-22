@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Stay, BillType, PaymentData } from "@/types/payment";
+import { Stay, BillType, PaymentData, PaymentStatus } from "@/types/payment";
 import { getAllStaysForPayment, getAllBillTypes, createPaymentAction } from "@/app/(dashboard)/payment/paymentAction";
 import PaymentForm from "./PaymentForm";
 import StayPaymentList from "./StayPaymentList";
 
 interface PaymentTableProps {
   adminId: string;
+  adminUsername: string;
 }
 
-const PaymentTable = ({ adminId }: PaymentTableProps) => {
+const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
   const [stays, setStays] = useState<Stay[]>([]);
   const [billTypes, setBillTypes] = useState<BillType[]>([]);
   const [selectedStay, setSelectedStay] = useState<Stay | null>(null);
@@ -18,7 +19,6 @@ const PaymentTable = ({ adminId }: PaymentTableProps) => {
   const [loadingMap, setLoadingMap] = useState<{ [key: string]: boolean }>({});
   const [isLoading, setIsLoading] = useState(true);
 
-  // ดึงข้อมูล stay และ bill type
   const fetchData = async () => {
     try {
       setIsLoading(true);
@@ -42,16 +42,20 @@ const PaymentTable = ({ adminId }: PaymentTableProps) => {
 
     setLoadingMap(prev => ({ ...prev, [selectedStay.stay_id]: true }));
     try {
-      await createPaymentAction(paymentData);
+      // ตั้งสถานะ default เป็น Processing (1)
+      const newPayment: PaymentData = {
+        ...paymentData,
+        status: PaymentStatus.Processing
+      };
+      await createPaymentAction(newPayment);
       setSelectedStay(null);
     } catch (err: any) {
       alert(err.message || "สร้างบิลไม่สำเร็จ");
     } finally {
-      setLoadingMap(prev => ({ ...prev, [selectedStay.stay_id]: false }));
+      setLoadingMap(prev => ({ ...prev, [selectedStay!.stay_id]: false }));
     }
   };
 
-  // แปลง stay_status เป็นข้อความ
   const getStayStatusText = (status: number) => {
     switch (status) {
       case 0: return "เข้าพัก";
@@ -106,6 +110,7 @@ const PaymentTable = ({ adminId }: PaymentTableProps) => {
           stay={selectedStay}
           adminId={adminId}
           billTypes={billTypes}
+          adminUsername={adminUsername}
           onSubmit={handleCreatePayment}
           onCancel={() => setSelectedStay(null)}
         />
@@ -114,6 +119,8 @@ const PaymentTable = ({ adminId }: PaymentTableProps) => {
       {viewStay && (
         <StayPaymentList
           stay={viewStay}
+          adminId={adminId}
+          adminUsername={adminUsername}
           onClose={() => setViewStay(null)}
         />
       )}

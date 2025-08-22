@@ -7,7 +7,7 @@ export interface Stay {
   user_name: string;
   room_id?: string;
   room_num: string;
-  room_price: number; // เพิ่ม field นี้
+  room_price: number;
 }
 
 export interface BillType {
@@ -18,7 +18,8 @@ export interface BillType {
 
 export enum PaymentStatus {
   Unpaid = "0",
-  Paid = "1",
+  Processing = "1",
+  Paid = "2",
 }
 
 export interface Payment {
@@ -31,6 +32,7 @@ export interface Payment {
   other_payment_detail?: string;
   payment_date: string;
   payment_status: PaymentStatus;
+  payment_total: number;
 }
 
 export interface PaymentData {
@@ -38,6 +40,8 @@ export interface PaymentData {
   admin_id: string;
   water_amount: number;
   ele_amount: number;
-  room_price: number; // เพิ่มตรงนี้
+  other_payment?: number;
+  other_payment_detail?: string;
+  room_price: number;
   payment_date: string;
 }
