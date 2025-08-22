@@ -7,6 +7,7 @@ export interface Stay {
   room_num: string;
   user_id?: string;
   room_id?: string;
+  room_price?: number;
 }
 
 export interface StayFormData {
