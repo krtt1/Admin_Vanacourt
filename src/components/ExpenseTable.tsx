@@ -1,0 +1,213 @@
+"use client";
+
+import { useState } from "react";
+import { Expense } from "@/types/finance";
+import { createExpense, updateExpense, deleteExpense } from "@/lib/api";
+
+interface Props {
+  expenses: Expense[];
+  onExpensesUpdate: (expenses: Expense[]) => void;
+}
+
+const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingAmount, setEditingAmount] = useState<number>(0);
+  const [editingCategory, setEditingCategory] = useState<string>("");
+  const [editingDate, setEditingDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [loading, setLoading] = useState(false);
+
+  const [newAmount, setNewAmount] = useState<number>(0);
+  const [newCategory, setNewCategory] = useState<string>("");
+  const [newDate, setNewDate] = useState<string>(new Date().toISOString().split("T")[0]);
+
+  // เริ่มแก้ไข
+  const handleEdit = (exp: Expense) => {
+    setEditingId(exp.expense_id);
+    setEditingAmount(Number(exp.expense_price) || 0);
+    setEditingCategory(exp.expense_type || "");
+    setEditingDate(exp.expense_date || new Date().toISOString().split("T")[0]);
+  };
+
+  // บันทึกแก้ไข
+  const handleSave = async (id: string) => {
+    if (!editingCategory || !editingDate || editingAmount <= 0) {
+      alert("กรุณากรอกข้อมูลครบถ้วนและจำนวนเงินมากกว่า 0");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const updated = await updateExpense(id, {
+        expense_price: editingAmount.toFixed(2), // DECIMAL ต้องเป็น string
+        expense_type: editingCategory,
+        expense_date: editingDate,
+        admin_id: "5779bb7e-5b77-4f0f-905b-4bde758059bf", // UUID default
+      });
+      onExpensesUpdate(expenses.map((e) => (e.expense_id === id ? updated : e)));
+      setEditingId(null);
+    } catch (err: any) {
+      alert("เกิดข้อผิดพลาด: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ลบรายการ
+  const handleDelete = async (id: string) => {
+    if (!confirm("คุณต้องการลบรายการนี้ใช่หรือไม่?")) return;
+    setLoading(true);
+    try {
+      await deleteExpense(id);
+      onExpensesUpdate(expenses.filter((e) => e.expense_id !== id));
+    } catch (err: any) {
+      alert("เกิดข้อผิดพลาด: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // เพิ่มรายการใหม่
+  const handleAdd = async () => {
+    if (!newCategory || !newDate || newAmount <= 0) {
+      alert("กรุณากรอกข้อมูลครบถ้วนและจำนวนเงินมากกว่า 0");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const added = await createExpense({
+        expense_type: newCategory,
+        expense_price: newAmount.toFixed(2), // แปลงเป็น string
+        expense_date: newDate,
+        admin_id: "5779bb7e-5b77-4f0f-905b-4bde758059bf", // UUID admin จริง
+      });
+      onExpensesUpdate([...expenses, added]);
+      setNewAmount(0);
+      setNewCategory("");
+      setNewDate(new Date().toISOString().split("T")[0]);
+    } catch (err: any) {
+      alert("ไม่สามารถเพิ่มรายจ่ายได้: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 p-4 bg-white rounded-lg shadow">
+      <h3 className="font-semibold mb-2">รายจ่าย</h3>
+
+      {/* Form เพิ่มรายการ */}
+      <div className="flex gap-2 mb-4">
+        <input
+          type="date"
+          value={newDate}
+          onChange={(e) => setNewDate(e.target.value)}
+          className="border px-2 py-1 rounded"
+        />
+        <input
+          type="number"
+          placeholder="จำนวนเงิน"
+          value={newAmount}
+          onChange={(e) => setNewAmount(Number(e.target.value))}
+          className="border px-2 py-1 rounded"
+        />
+        <input
+          type="text"
+          placeholder="ประเภท"
+          value={newCategory}
+          onChange={(e) => setNewCategory(e.target.value)}
+          className="border px-2 py-1 rounded"
+        />
+        <button
+          onClick={handleAdd}
+          disabled={loading}
+          className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+        >
+          เพิ่ม
+        </button>
+      </div>
+
+      {/* ตารางรายจ่าย */}
+      <table className="w-full border-collapse border">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="border px-2 py-1">วันที่</th>
+            <th className="border px-2 py-1">จำนวนเงิน</th>
+            <th className="border px-2 py-1">ประเภท</th>
+            <th className="border px-2 py-1">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {expenses.map((exp) => (
+            <tr key={exp.expense_id}>
+              <td className="border px-2 py-1">
+                {editingId === exp.expense_id ? (
+                  <input
+                    type="date"
+                    value={editingDate}
+                    onChange={(e) => setEditingDate(e.target.value)}
+                    className="w-full border px-1 py-0.5 rounded"
+                  />
+                ) : (
+                  exp.expense_date
+                )}
+              </td>
+              <td className="border px-2 py-1">
+                {editingId === exp.expense_id ? (
+                  <input
+                    type="number"
+                    value={editingAmount}
+                    onChange={(e) => setEditingAmount(Number(e.target.value))}
+                    className="w-full border px-1 py-0.5 rounded"
+                  />
+                ) : (
+                  Number(exp.expense_price).toLocaleString()
+                )}
+              </td>
+              <td className="border px-2 py-1">
+                {editingId === exp.expense_id ? (
+                  <input
+                    type="text"
+                    value={editingCategory}
+                    onChange={(e) => setEditingCategory(e.target.value)}
+                    className="w-full border px-1 py-0.5 rounded"
+                  />
+                ) : (
+                  exp.expense_type
+                )}
+              </td>
+              <td className="border px-2 py-1 space-x-2">
+                {editingId === exp.expense_id ? (
+                  <button
+                    disabled={loading}
+                    onClick={() => handleSave(exp.expense_id)}
+                    className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                  >
+                    บันทึก
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleEdit(exp)}
+                      className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      แก้ไข
+                    </button>
+                    <button
+                      onClick={() => handleDelete(exp.expense_id)}
+                      className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                      ลบ
+                    </button>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default ExpenseTable;

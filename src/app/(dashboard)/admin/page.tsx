@@ -2,7 +2,6 @@
 import UserCard from "@/components/UserCard";
 import RoomCard from "@/components/RoomCard";
 import RepairCard from "@/components/RepairCard";
-import AttendanceChart from "@/components/AttendanceChart";
 import EventCalendar from "@/components/EventCalendar";
 import Announcements from "@/components/Announcements";
 import { getAllUsers, getAllRooms, getAllRepairs } from "@/lib/api"; // <--- แก้ไขตรงนี้: เปลี่ยน getAllRepairLists เป็น getAllRepairs
@@ -16,7 +15,7 @@ const AdminPage = async () => {
   // --- 2. ดึงและประมวลผลข้อมูลห้องพัก (Rooms) ---
   let availableRooms = 0;
   let occupiedRooms = 0;
-  const rooms = await getAllRooms();
+  const rooms = await getAllRooms(); 
   if (rooms) {
     // สมมติว่า "0" คือว่าง, ค่าอื่นๆ คือไม่ว่าง
     availableRooms = rooms.filter(room => room.room_status === "0").length;
@@ -44,10 +43,7 @@ const AdminPage = async () => {
           <RepairCard type="รายการซ่อม" count={totalRepairRequests}/>
         </div>
 
-        {/* Middle Chart Section */}
-        <div className="w-full h-[450px]">
-          <AttendanceChart/>
-        </div>
+        
       </div>
 
       {/* RIGHT Section: Contains Calendar and Announcements */}
