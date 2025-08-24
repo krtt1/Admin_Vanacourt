@@ -1,5 +1,5 @@
 {
-  "name": "lama-dev-next-dashboard",
+  "name": "Admin Vanacourt",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "chart.js": "^4.5.0",
+    "date-fns": "^4.1.0",
     "next": "14.2.5",
     "re-chart": "^1.0.0",
     "react": "^18",

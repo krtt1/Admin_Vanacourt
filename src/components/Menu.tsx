@@ -12,7 +12,7 @@ const menuItems = [
       { icon: "/repairs.png", label: "Repairs", href: "/repairs" },
       { icon: "/income.png", label: "Income and Expenses", href: "/finance" },
       { icon: "/room.png", label: "Room", href: "/room" },
-      { icon: "/announcement.png", label: "Announcements", href: "/list/announcements" },
+      { icon: "/announcement.png", label: "Announcements", href: "/notifications" },
     ],
   },
   {

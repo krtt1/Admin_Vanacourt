@@ -11,6 +11,22 @@ interface StayWithRoom {
   room_num: string;
 }
 
+// Mapping status อังกฤษ ↔ ไทย
+const statusMap: { [key: string]: string } = {
+  pending: "รอดำเนินการ",
+  in_progress: "กำลังดำเนินการ",
+  completed: "ซ่อมแล้ว",
+  cancelled: "ยกเลิกแล้ว"
+};
+
+const thaiToEngStatus: { [key: string]: string } = {
+  "รอดำเนินการ": "pending",
+  "รอซ่อม": "pending",
+  "กำลังดำเนินการ": "in_progress",
+  "ซ่อมแล้ว": "completed",
+  "ยกเลิกแล้ว": "cancelled"
+};
+
 const RepairsTable = () => {
   const router = useRouter();
 
@@ -78,54 +94,58 @@ const RepairsTable = () => {
   };
 
   const handleSubmit = async (e: FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setError(null);
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
-  if (!formData.stay_id || !formData.repairlist_id) {
-    setError("กรุณาเลือกห้องและรายการซ่อมให้ถูกต้อง");
-    setLoading(false);
-    return;
-  }
-
-  // แปลงวันที่เป็น ISO string
-  const repairDateISO = formData.reported_date
-    ? new Date(formData.reported_date).toISOString()
-    : new Date().toISOString();
-
-  const payload = {
-    stay_id: formData.stay_id,
-    admin_id: formData.admin_id,
-    repairlist_id: String(formData.repairlist_id),
-    repair_status: formData.status || "pending",
-    repair_date: repairDateISO,
-  };
-
-  try {
-    if (editingRepair) {
-      await updateRepairItem(editingRepair.repair_id, payload);
-    } else {
-      await createRepairItem(payload);
+    if (!formData.stay_id || !formData.repairlist_id) {
+      setError("กรุณาเลือกห้องและรายการซ่อมให้ถูกต้อง");
+      setLoading(false);
+      return;
     }
-    resetForm();
-    setShowForm(false);
-    fetchRepairs();
-  } catch (err: any) {
-    console.error(err);
-    setError(err.message || "เกิดข้อผิดพลาด");
-  } finally {
-    setLoading(false);
-  }
-};
+
+    // แปลงวันที่เป็น ISO string
+    const repairDateISO = formData.reported_date
+      ? new Date(formData.reported_date).toISOString()
+      : new Date().toISOString();
+
+    const payload = {
+      stay_id: formData.stay_id,
+      admin_id: formData.admin_id,
+      repairlist_id: String(formData.repairlist_id),
+      repair_status: formData.status, // ใช้ค่าอังกฤษ
+      repair_date: repairDateISO,
+    };
+
+    try {
+      if (editingRepair) {
+        await updateRepairItem(editingRepair.repair_id, payload);
+      } else {
+        await createRepairItem(payload);
+      }
+      resetForm();
+      setShowForm(false);
+      fetchRepairs();
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "เกิดข้อผิดพลาด");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEdit = (item: RepairItem) => {
     setEditingRepair(item);
     const stay = stays.find(s => s.room_num === item.room_num);
+
+    // แปลง status ไทยจาก backend เป็นอังกฤษ
+    const statusValue = thaiToEngStatus[item.repair_status || ""] || "pending";
+
     setFormData({
       stay_id: stay?.stay_id || "",
       admin_id: item.admin_id || "5779bb7e-5b77-4f0f-905b-4bde758059bf",
       repairlist_id: item.repairlist?.repairlist_id || 0,
-      status: item.repair_status?.toString() || "pending",
+      status: statusValue,
       reported_date: item.repair_date?.split("T")[0] || new Date().toISOString().split("T")[0],
     });
     setShowForm(true);
@@ -253,7 +273,7 @@ const RepairsTable = () => {
                   <td className="py-3 px-6">{item.repairlist?.repairlist_details}</td>
                   <td className="py-3 px-6">{item.repairlist?.repairlist_price}</td>
                   <td className="py-3 px-6">{item.admin_name}</td>
-                  <td className="py-3 px-6">{item.repair_status}</td>
+                  <td className="py-3 px-6">{statusMap[item.repair_status] || item.repair_status}</td>
                   <td className="py-3 px-6">{item.repair_date?.split("T")[0]}</td>
                   <td className="py-3 px-6 text-center flex justify-center gap-2">
                     <button onClick={() => handleEdit(item)} className="bg-yellow-500 hover:bg-yellow-700 text-white py-1 px-3 rounded text-xs">แก้ไข</button>

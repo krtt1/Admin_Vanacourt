@@ -6,8 +6,10 @@ import { RepairItem, RepairFormData, RepairlistItem } from "@/types/repair";
 import { Stay, StayFormData } from "@/types/stay";
 import { BillType, Payment, PaymentData } from "@/types/payment";
 import { Income, Expense } from "@/types/finance";
+import { NotificationItem, NotificationPayload } from "@/types/notification";
 
 const BASE_URL = "http://localhost:5000";
+const NOTIF_BASE = `${BASE_URL}/notificationrepairs`;
 
 // -------------------- Helper --------------------
 async function handleFetch<T>(url: string, options?: RequestInit): Promise<T> {
@@ -133,43 +135,28 @@ export async function createRepairItem(repairData: RepairFormData): Promise<Repa
 }
 
 // แก้ update ให้ส่ง id + payload
-export async function updateRepairItem(
-  repairId: string,
-  repairData: Partial<RepairFormData>
-): Promise<RepairItem & { otp?: string }> {
-  // แปลงวันที่เป็น ISO string
-  const repairDateISO = repairData.reported_date
-    ? new Date(repairData.reported_date).toISOString()
-    : new Date().toISOString();
+// ฟังก์ชันอัปเดตการซ่อม
+export const updateRepairItem = async (repairId: number, payload: any) => {
+  try {
+    const res = await fetch(`${BASE_URL}/repairs/${repairId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
 
-  const payload = {
-    id: repairId,
-    stay_id: repairData.stay_id,
-    admin_id: repairData.admin_id,
-    repairlist_id: repairData.repairlist_id != null ? String(repairData.repairlist_id) : undefined,
-    repair_status: repairData.status || "pending",
-    repair_date: repairDateISO,
-  };
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || "เกิดข้อผิดพลาดในการอัปเดต");
+    }
 
-  console.log("Updating repair with payload:", payload);
-
-  const r = await handleFetch(`${BASE_URL}/repairs/update`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  return {
-    ...r,
-    repairlist: r.repairlist
-      ? {
-          repairlist_details: r.repairlist.repairlist_details ?? "",
-          repairlist_price: safeNumber(r.repairlist.repairlist_price),
-        }
-      : null,
-    otp: r.otp,
-  };
-}
+    return await res.json();
+  } catch (err) {
+    console.error("updateRepairItem error:", err);
+    throw err;
+  }
+};
 
 // ลบรายการซ่อม
 export async function deleteRepairItem(repairId: string): Promise<boolean> {
@@ -329,4 +316,51 @@ export const getYearEndBalance = async (year: number): Promise<number> => {
     `${BASE_URL}/expenses/summary/year/${year}`
   );
   return (Number(incomes.total) || 0) - (Number(expenses.total) || 0);
+};
+
+// ดึง Notification ของ user หรือ admin
+export const getNotifications = async (userId?: string, adminId?: string): Promise<NotificationItem[]> => {
+  try {
+    let url = `${NOTIF_BASE}/getall`; // default get all
+    const params: any = {};
+
+    if (userId || adminId) {
+      url = `${NOTIF_BASE}/user-or-admin`;
+      if (userId) params.user_id = userId;
+      if (adminId) params.admin_id = adminId;
+    }
+
+    const query = new URLSearchParams(params).toString();
+    const finalUrl = query ? `${url}?${query}` : url;
+
+    const data: NotificationItem[] = await handleFetch(finalUrl, { cache: "no-store" });
+    return data;
+  } catch (err: any) {
+    console.error(err);
+    throw new Error("ไม่สามารถดึง Notification ได้");
+  }
+};
+
+// mark as read
+export const markNotificationAsRead = async (notificationId: string) => {
+  try {
+    return await handleFetch(`${NOTIF_BASE}/${notificationId}/read`, { method: "PATCH" });
+  } catch (err: any) {
+    console.error(err);
+    throw new Error("ไม่สามารถ mark as read ได้");
+  }
+};
+
+// สร้าง Notification
+export const createNotification = async (payload: NotificationPayload) => {
+  try {
+    return await handleFetch(`${NOTIF_BASE}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err: any) {
+    console.error(err);
+    throw new Error("ไม่สามารถสร้าง Notification ได้");
+  }
 };
