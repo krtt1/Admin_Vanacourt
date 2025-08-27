@@ -1,4 +1,4 @@
-import { BillType, PaymentData, Payment, Stay } from "@/types/payment";
+import { BillType, PaymentData, Payment, Stay, PaymentSlip } from "@/types/payment";
 
 const BASE_URL = "http://localhost:5000";
 
@@ -71,4 +71,17 @@ export const getAllStaysForPayment = async (): Promise<Stay[]> => {
     room_num: s.room_num ?? "Unknown Room",
     room_price: s.room_price ?? 0,
   }));
+};
+
+// ----------------- Payment Slip -----------------
+
+// ดึงสลิปทั้งหมด
+export const getAllPaymentSlips = async (): Promise<PaymentSlip[]> => {
+  return apiFetch<PaymentSlip[]>(`/payment-slips`);
+};
+
+// ดึงสลิปของ Payment เฉพาะตัว
+export const getSlipsByPayment = async (paymentId: string): Promise<PaymentSlip[]> => {
+  const allSlips = await getAllPaymentSlips();
+  return allSlips.filter(slip => slip.payment_id === paymentId);
 };

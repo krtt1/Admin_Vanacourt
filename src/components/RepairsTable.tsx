@@ -11,20 +11,15 @@ interface StayWithRoom {
   room_num: string;
 }
 
-// Mapping status อังกฤษ ↔ ไทย
+// Mapping status อังกฤษ ↔ ไทย (เฉพาะ 2 สถานะ)
 const statusMap: { [key: string]: string } = {
-  pending: "รอดำเนินการ",
-  in_progress: "กำลังดำเนินการ",
-  completed: "ซ่อมแล้ว",
-  cancelled: "ยกเลิกแล้ว"
+  pending: "รอซ่อม",
+  completed: "ซ่อมแล้ว"
 };
 
 const thaiToEngStatus: { [key: string]: string } = {
-  "รอดำเนินการ": "pending",
   "รอซ่อม": "pending",
-  "กำลังดำเนินการ": "in_progress",
-  "ซ่อมแล้ว": "completed",
-  "ยกเลิกแล้ว": "cancelled"
+  "ซ่อมแล้ว": "completed"
 };
 
 const RepairsTable = () => {
@@ -41,13 +36,11 @@ const RepairsTable = () => {
 
   const [formData, setFormData] = useState<RepairFormData>({
     stay_id: "",
-    admin_id: "5779bb7e-5b77-4f0f-905b-4bde758059bf",
     repairlist_id: 0,
     status: "pending",
     reported_date: new Date().toISOString().split("T")[0],
   });
 
-  // โหลดข้อมูลทั้งหมด
   useEffect(() => {
     fetchRepairs();
     fetchStays();
@@ -57,7 +50,13 @@ const RepairsTable = () => {
   const fetchRepairs = async () => {
     try {
       const data = await getAllRepairs();
-      setRepairs(data);
+      const mappedData = data
+        .filter(r => r.repair_status === "pending" || r.repair_status === "completed")
+        .map(r => ({
+          ...r,
+          room_num: r.room_num || "ไม่พบข้อมูลห้อง",
+        }));
+      setRepairs(mappedData);
     } catch (err: any) {
       console.error(err);
       setError(err.message);
@@ -85,7 +84,6 @@ const RepairsTable = () => {
   const resetForm = () => {
     setFormData({
       stay_id: "",
-      admin_id: "5779bb7e-5b77-4f0f-905b-4bde758059bf",
       repairlist_id: 0,
       status: "pending",
       reported_date: new Date().toISOString().split("T")[0],
@@ -104,17 +102,11 @@ const RepairsTable = () => {
       return;
     }
 
-    // แปลงวันที่เป็น ISO string
-    const repairDateISO = formData.reported_date
-      ? new Date(formData.reported_date).toISOString()
-      : new Date().toISOString();
-
     const payload = {
       stay_id: formData.stay_id,
-      admin_id: formData.admin_id,
       repairlist_id: String(formData.repairlist_id),
-      repair_status: formData.status, // ใช้ค่าอังกฤษ
-      repair_date: repairDateISO,
+      repair_status: formData.status,
+      repair_date: new Date(formData.reported_date).toISOString(),
     };
 
     try {
@@ -136,14 +128,11 @@ const RepairsTable = () => {
 
   const handleEdit = (item: RepairItem) => {
     setEditingRepair(item);
-    const stay = stays.find(s => s.room_num === item.room_num);
-
-    // แปลง status ไทยจาก backend เป็นอังกฤษ
+    const stay = stays.find(s => s.stay_id === item.stay_id);
     const statusValue = thaiToEngStatus[item.repair_status || ""] || "pending";
 
     setFormData({
       stay_id: stay?.stay_id || "",
-      admin_id: item.admin_id || "5779bb7e-5b77-4f0f-905b-4bde758059bf",
       repairlist_id: item.repairlist?.repairlist_id || 0,
       status: statusValue,
       reported_date: item.repair_date?.split("T")[0] || new Date().toISOString().split("T")[0],
@@ -202,10 +191,10 @@ const RepairsTable = () => {
               required
               className="shadow border rounded w-full py-2 px-3"
             >
-              <option value="">-- เลือกรายการซ่อม --</option>
+              <option value="">-- รายการซ่อม --</option>
               {repairlists.map(r => (
                 <option key={r.repairlist_id} value={String(r.repairlist_id)}>
-                  {r.repairlist_details} ({r.repairlist_price})
+                  {r.repairlist_details}
                 </option>
               ))}
             </select>
@@ -219,10 +208,14 @@ const RepairsTable = () => {
               onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
               className="shadow border rounded w-full py-2 px-3"
             >
-              <option value="pending">รอดำเนินการ</option>
-              <option value="in_progress">กำลังดำเนินการ</option>
-              <option value="completed">ซ่อมแล้ว</option>
-              <option value="cancelled">ยกเลิกแล้ว</option>
+              {editingRepair ? (
+                <>
+                  <option value="pending">รอซ่อม</option>
+                  <option value="completed">ซ่อมแล้ว</option>
+                </>
+              ) : (
+                <option value="pending">รอซ่อม</option>
+              )}
             </select>
           </div>
 
@@ -259,8 +252,6 @@ const RepairsTable = () => {
               <tr className="bg-gray-100 text-gray-600 uppercase text-sm">
                 <th className="py-3 px-6 text-left">ห้อง</th>
                 <th className="py-3 px-6 text-left">รายละเอียด</th>
-                <th className="py-3 px-6 text-left">ราคา</th>
-                <th className="py-3 px-6 text-left">ผู้แจ้งซ่อม</th>
                 <th className="py-3 px-6 text-left">สถานะ</th>
                 <th className="py-3 px-6 text-left">วันที่แจ้ง</th>
                 <th className="py-3 px-6 text-center">Actions</th>
@@ -270,9 +261,7 @@ const RepairsTable = () => {
               {repairs.map(item => (
                 <tr key={item.repair_id} className="border-b border-gray-200 hover:bg-gray-50">
                   <td className="py-3 px-6">{item.room_num}</td>
-                  <td className="py-3 px-6">{item.repairlist?.repairlist_details}</td>
-                  <td className="py-3 px-6">{item.repairlist?.repairlist_price}</td>
-                  <td className="py-3 px-6">{item.admin_name}</td>
+                  <td className="py-3 px-6">{item.repairlist?.repairlist_details || "ไม่มีรายละเอียด"}</td>
                   <td className="py-3 px-6">{statusMap[item.repair_status] || item.repair_status}</td>
                   <td className="py-3 px-6">{item.repair_date?.split("T")[0]}</td>
                   <td className="py-3 px-6 text-center flex justify-center gap-2">

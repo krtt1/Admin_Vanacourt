@@ -45,3 +45,12 @@ export interface PaymentData {
   room_price: number;
   payment_date: string;
 }
+
+export interface PaymentSlip {
+  slip_id: string;
+  payment_id: string;
+  stay_id: string;
+  user_id: string;
+  slip_url: string;
+  uploaded_at: string;
+}

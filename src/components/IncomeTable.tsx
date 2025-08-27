@@ -2,81 +2,100 @@
 
 import { useState } from "react";
 import { Income } from "@/types/finance";
-import { createIncome, deleteIncome } from "@/lib/api";
 
 interface Props {
   incomes: Income[];
   onIncomesUpdate: (incomes: Income[]) => void;
 }
 
-const IncomeTable = ({ incomes, onIncomesUpdate }: Props) => {
-  const [newIncome, setNewIncome] = useState({ income_type: "", income_amount: "", income_date: "" });
+const IncomeTable = ({ incomes }: Props) => {
+  const [selectedYear, setSelectedYear] = useState<string>("ทั้งหมด");
+  const [selectedMonth, setSelectedMonth] = useState<string>("ทั้งหมด");
 
-  const handleAdd = async () => {
-    if (!newIncome.income_type || !newIncome.income_amount || !newIncome.income_date) {
-      alert("กรุณากรอกข้อมูลให้ครบ");
-      return;
-    }
+  // ดึงปีที่มีอยู่ในข้อมูล (ไม่ซ้ำ)
+  const years = Array.from(
+    new Set(incomes.map((i) => new Date(i.income_date).getFullYear()))
+  ).sort((a, b) => b - a); // เรียงจากใหม่ -> เก่า
 
-    try {
-      const created = await createIncome({
-        income_type: newIncome.income_type,
-        income_amount: Number(newIncome.income_amount),
-        income_date: newIncome.income_date,
-      });
+  // ฟิลเตอร์ข้อมูลตามปี & เดือน
+  const filteredIncomes = incomes.filter((i) => {
+    const incomeDate = new Date(i.income_date);
+    const year = incomeDate.getFullYear();
+    const month = incomeDate.getMonth() + 1;
 
-      onIncomesUpdate([...incomes, created]);
-      setNewIncome({ income_type: "", income_amount: "", income_date: "" });
-    } catch (err: any) {
-      console.error("ไม่สามารถเพิ่มรายรับได้:", err.message);
-      alert("ไม่สามารถเพิ่มรายรับได้: " + err.message);
-    }
-  };
+    if (selectedYear !== "ทั้งหมด" && year !== Number(selectedYear)) return false;
+    if (selectedMonth !== "ทั้งหมด" && month !== Number(selectedMonth)) return false;
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("ลบรายการนี้?")) return;
-    await deleteIncome(id);
-    onIncomesUpdate(incomes.filter((i) => i.income_id !== id));
-  };
+    return true;
+  });
 
   return (
-    <div className="mt-4">
-      <table className="w-full border">
-        <thead>
-          <tr>
-            <th>ประเภท</th>
-            <th>จำนวนเงิน</th>
-            <th>วันที่</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {incomes.map((i) => (
-            <tr key={i.income_id}>
-              <td>{i.income_type}</td>
-              <td>{i.income_amount}</td>
-              <td>{i.income_date}</td>
-              <td>
-                <button onClick={() => handleDelete(i.income_id)} className="px-2 py-1 bg-red-500 text-white rounded">ลบ</button>
-              </td>
-            </tr>
+    <div className="mt-6 bg-white shadow-md rounded-lg p-4">
+      <h2 className="text-lg font-semibold mb-4 text-center">ข้อมูลรายรับ</h2>
+
+      {/* === ตัวเลือกกรองข้อมูล === */}
+      <div className="flex flex-wrap gap-4 justify-center mb-4">
+        {/* เลือกปี */}
+        <select
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(e.target.value)}
+          className="px-3 py-2 border rounded-lg shadow-sm focus:ring focus:ring-blue-300"
+        >
+          <option value="ทั้งหมด">ทั้งหมด (ปี)</option>
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
           ))}
-          <tr>
-            <td>
-              <input type="text" value={newIncome.income_type} onChange={(e) => setNewIncome({ ...newIncome, income_type: e.target.value })} placeholder="ประเภท" />
-            </td>
-            <td>
-              <input type="number" value={newIncome.income_amount} onChange={(e) => setNewIncome({ ...newIncome, income_amount: e.target.value })} placeholder="จำนวนเงิน" />
-            </td>
-            <td>
-              <input type="date" value={newIncome.income_date} onChange={(e) => setNewIncome({ ...newIncome, income_date: e.target.value })} />
-            </td>
-            <td>
-              <button onClick={handleAdd} className="px-2 py-1 bg-green-500 text-white rounded">เพิ่ม</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        </select>
+
+        {/* เลือกเดือน */}
+        <select
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          className="px-3 py-2 border rounded-lg shadow-sm focus:ring focus:ring-blue-300"
+        >
+          <option value="ทั้งหมด">ทั้งหมด (เดือน)</option>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+            <option key={m} value={m}>
+              เดือน {m}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* === ตารางข้อมูลรายรับ === */}
+      <div className="overflow-x-auto">
+        <table className="w-full border border-gray-200 rounded-lg text-center">
+          <thead>
+            <tr className="bg-gray-100 text-gray-700">
+              <th className="py-3 px-4 border">จำนวนเงิน</th>
+              <th className="py-3 px-4 border">วันที่</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredIncomes.length > 0 ? (
+              filteredIncomes.map((i) => (
+                <tr
+                  key={i.income_id}
+                  className="hover:bg-gray-50 transition duration-150"
+                >
+                  <td className="py-2 px-4 border">
+                    {i.income_amount.toLocaleString()} บาท
+                  </td>
+                  <td className="py-2 px-4 border">{i.income_date}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={2} className="text-center text-gray-500 py-4">
+                  ไม่พบข้อมูลรายรับ
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

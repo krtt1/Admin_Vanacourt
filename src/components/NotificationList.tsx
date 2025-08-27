@@ -1,4 +1,3 @@
-// src/components/NotificationList.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,11 +6,10 @@ import { getNotifications, markNotificationAsRead } from "@/lib/api";
 import { formatDistanceToNow, parseISO } from "date-fns";
 
 interface Props {
-  userId?: string;
-  adminId?: string;
+  userId: string; // เหลือแค่ userId
 }
 
-const NotificationList = ({ userId, adminId }: Props) => {
+const NotificationList = ({ userId }: Props) => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +18,7 @@ const NotificationList = ({ userId, adminId }: Props) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getNotifications(userId, adminId);
+      const data = await getNotifications(userId); // เรียกแค่ userId
       setNotifications(data);
     } catch (err: any) {
       console.error(err);
@@ -32,7 +30,7 @@ const NotificationList = ({ userId, adminId }: Props) => {
 
   useEffect(() => {
     fetchNotifications();
-  }, [userId, adminId]);
+  }, [userId]);
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -60,12 +58,12 @@ const NotificationList = ({ userId, adminId }: Props) => {
         >
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold text-sm">
-              {notif.user?.user_name?.[0] || notif.admin?.admin_name?.[0] || "S"}
+              {notif.user_name?.[0].toUpperCase() || "S"}
             </div>
 
             <div className="flex-1">
               <div className="flex items-center justify-between">
-                <p className="font-semibold">{notif.user?.user_name || notif.admin?.admin_name || "System"}</p>
+                <p className="font-semibold">{notif.user_name || "System"}</p>
                 <p className="text-xs text-gray-400">
                   {formatDistanceToNow(parseISO(notif.created_at), { addSuffix: true })}
                 </p>

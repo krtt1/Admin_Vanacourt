@@ -77,42 +77,6 @@ const NotificationPage = () => {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-50">
-      {/* Sidebar */}
-      <aside className="md:w-64 w-full bg-white p-6 border-r border-gray-200 md:h-screen">
-        <h2 className="text-xl font-bold mb-6">Filters</h2>
-
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-1">เลือก User</label>
-          <select
-            className="w-full border border-gray-300 rounded px-3 py-2"
-            value={selectedUser || ""}
-            onChange={(e) => handleUserChange(e.target.value)}
-          >
-            <option value=""> เลือกทั้งหมด </option>
-            {loadingUsers ? (
-              <option disabled>Loading...</option>
-            ) : (
-              users.map(u => (
-                <option key={u.user_id} value={u.user_id}>{u.user_name}</option>
-              ))
-            )}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">เลือก Admin</label>
-          <select
-            className="w-full border border-gray-300 rounded px-3 py-2"
-            value={selectedAdmin || ""}
-            onChange={(e) => handleAdminChange(e.target.value)}
-          >
-            <option value=""> เลือกทั้งหมด </option>
-            {admins.map(a => (
-              <option key={a.admin_id} value={a.admin_id}>{a.admin_name}</option>
-            ))}
-          </select>
-        </div>
-      </aside>
 
       {/* Main Content */}
       <main className="flex-1 p-6">

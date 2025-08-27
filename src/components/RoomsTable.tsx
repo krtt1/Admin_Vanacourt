@@ -17,9 +17,10 @@ const RoomsTable: React.FC<RoomsTableProps> = ({ initialRooms }) => {
   const [showForm, setShowForm] = useState<boolean>(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
 
+  // ✅ ค่าเริ่มต้นของ room_status เป็น "0" (ว่าง)
   const [formData, setFormData] = useState<RoomFormData>({
     room_num: '',
-    room_status: 'available',
+    room_status: '0', // 0 = ว่าง, 1 = ไม่ว่าง
     room_price: 0,
   });
 
@@ -35,23 +36,6 @@ const RoomsTable: React.FC<RoomsTableProps> = ({ initialRooms }) => {
     }));
   };
 
-  const getBackendStatusValue = (
-    formStatus: 'available' | 'occupied' | 'cleaning' | 'maintenance' | string
-  ): string => {
-    switch (formStatus) {
-      case 'available':
-        return '0';
-      case 'occupied':
-        return '1';
-      case 'cleaning':
-        return '2';
-      case 'maintenance':
-        return '3';
-      default:
-        return String(formStatus);
-    }
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -60,7 +44,7 @@ const RoomsTable: React.FC<RoomsTableProps> = ({ initialRooms }) => {
     try {
       const dataToSend = {
         ...formData,
-        room_status: getBackendStatusValue(formData.room_status),
+        room_status: formData.room_status, // ส่งเป็น '0' หรือ '1' ตามที่เลือก
       };
 
       let result;
@@ -89,32 +73,11 @@ const RoomsTable: React.FC<RoomsTableProps> = ({ initialRooms }) => {
     }
   };
 
-  const getRoomStatusValueForForm = (
-    statusValue: string | number
-  ): 'available' | 'occupied' | 'cleaning' | 'maintenance' | string => {
-    switch (String(statusValue)) {
-      case 'available':
-      case '0':
-        return 'available';
-      case 'occupied':
-      case '1':
-        return 'occupied';
-      case 'cleaning':
-      case '2':
-        return 'cleaning';
-      case 'maintenance':
-      case '3':
-        return 'maintenance';
-      default:
-        return String(statusValue);
-    }
-  };
-
   const handleEdit = (room: Room) => {
     setEditingRoom(room);
     setFormData({
       room_num: room.room_num,
-      room_status: getRoomStatusValueForForm(room.room_status),
+      room_status: String(room.room_status), // ใช้ค่าตัวเลขจาก DB
       room_price: Number(room.room_price),
     });
     setShowForm(true);
@@ -144,7 +107,7 @@ const RoomsTable: React.FC<RoomsTableProps> = ({ initialRooms }) => {
   const resetForm = () => {
     setFormData({
       room_num: '',
-      room_status: 'available',
+      room_status: '0', // ✅ รีเซ็ตเป็นว่าง
       room_price: 0,
     });
     setEditingRoom(null);
@@ -152,16 +115,12 @@ const RoomsTable: React.FC<RoomsTableProps> = ({ initialRooms }) => {
 
   const getStatusDisplayText = (statusValue: string | number): string => {
     switch (String(statusValue)) {
-      case 'available':
       case '0':
         return 'ว่าง';
-      case 'occupied':
       case '1':
         return 'ไม่ว่าง';
-      case 'cleaning':
       case '2':
         return 'กำลังทำความสะอาด';
-      case 'maintenance':
       case '3':
         return 'กำลังซ่อมบำรุง';
       default:
@@ -213,10 +172,9 @@ const RoomsTable: React.FC<RoomsTableProps> = ({ initialRooms }) => {
                 className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                 required
               >
-                <option value="available">ว่าง</option>
-                <option value="occupied">ไม่ว่าง</option>
-                <option value="cleaning">กำลังทำความสะอาด</option>
-                <option value="maintenance">กำลังซ่อมบำรุง</option>
+                <option value="0">ว่าง</option>
+                <option value="1">ไม่ว่าง</option>
+                
               </select>
             </div>
             <div>
@@ -275,7 +233,7 @@ const RoomsTable: React.FC<RoomsTableProps> = ({ initialRooms }) => {
             <tbody className="text-gray-600 text-sm font-light">
               {rooms
                 .slice()
-                .sort((a, b) => Number(a.room_num) - Number(b.room_num)) // ✅ sort ASC
+                .sort((a, b) => Number(a.room_num) - Number(b.room_num))
                 .map((room) => (
                   <tr key={room.room_id} className="border-b border-gray-200 hover:bg-gray-50">
                     <td className="py-3 px-6 text-left">{room.room_num}</td>
@@ -291,12 +249,15 @@ const RoomsTable: React.FC<RoomsTableProps> = ({ initialRooms }) => {
                         >
                           แก้ไข
                         </button>
-                        <button
-                          onClick={() => handleDelete(room.room_id)}
-                          className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-xs"
-                        >
-                          ลบ
-                        </button>
+                        {/* ✅ ซ่อนปุ่มลบเมื่อสถานะเป็น "ไม่ว่าง" */}
+                        {String(room.room_status) !== '1' && (
+                          <button
+                            onClick={() => handleDelete(room.room_id)}
+                            className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-xs"
+                          >
+                            ลบ
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -4,7 +4,7 @@ import { User, UserFormData } from "@/types/user";
 import { Room, RoomFormData } from "@/types/room";
 import { RepairItem, RepairFormData, RepairlistItem } from "@/types/repair";
 import { Stay, StayFormData } from "@/types/stay";
-import { BillType, Payment, PaymentData } from "@/types/payment";
+import { BillType, Payment, PaymentData, PaymentSlip } from "@/types/payment";
 import { Income, Expense } from "@/types/finance";
 import { NotificationItem, NotificationPayload } from "@/types/notification";
 
@@ -236,6 +236,8 @@ export async function createPaymentAction(
     return { success: false, message: err.message || "Cannot create payment" };
   }
 }
+
+
 
 // ==================== FINANCIAL / EXPENSE ====================
 export interface ExpensePayload {

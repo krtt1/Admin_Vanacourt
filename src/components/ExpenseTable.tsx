@@ -20,7 +20,23 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
   const [newCategory, setNewCategory] = useState<string>("");
   const [newDate, setNewDate] = useState<string>(new Date().toISOString().split("T")[0]);
 
-  // เริ่มแก้ไข
+  // ตัวกรอง
+  const [selectedYear, setSelectedYear] = useState<string>("ทั้งหมด");
+  const [selectedMonth, setSelectedMonth] = useState<string>("ทั้งหมด");
+
+  // ดึงปีจากข้อมูล
+  const years = Array.from(new Set(expenses.map((e) => new Date(e.expense_date).getFullYear()))).sort((a, b) => b - a);
+
+  // ฟิลเตอร์ตามปี/เดือน
+  const filteredExpenses = expenses.filter((e) => {
+    const d = new Date(e.expense_date);
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    if (selectedYear !== "ทั้งหมด" && year !== Number(selectedYear)) return false;
+    if (selectedMonth !== "ทั้งหมด" && month !== Number(selectedMonth)) return false;
+    return true;
+  });
+
   const handleEdit = (exp: Expense) => {
     setEditingId(exp.expense_id);
     setEditingAmount(Number(exp.expense_price) || 0);
@@ -28,7 +44,6 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
     setEditingDate(exp.expense_date || new Date().toISOString().split("T")[0]);
   };
 
-  // บันทึกแก้ไข
   const handleSave = async (id: string) => {
     if (!editingCategory || !editingDate || editingAmount <= 0) {
       alert("กรุณากรอกข้อมูลครบถ้วนและจำนวนเงินมากกว่า 0");
@@ -38,10 +53,10 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
     setLoading(true);
     try {
       const updated = await updateExpense(id, {
-        expense_price: editingAmount.toFixed(2), // DECIMAL ต้องเป็น string
+        expense_price: editingAmount.toFixed(2),
         expense_type: editingCategory,
         expense_date: editingDate,
-        admin_id: "5779bb7e-5b77-4f0f-905b-4bde758059bf", // UUID default
+        admin_id: "5779bb7e-5b77-4f0f-905b-4bde758059bf",
       });
       onExpensesUpdate(expenses.map((e) => (e.expense_id === id ? updated : e)));
       setEditingId(null);
@@ -52,7 +67,6 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
     }
   };
 
-  // ลบรายการ
   const handleDelete = async (id: string) => {
     if (!confirm("คุณต้องการลบรายการนี้ใช่หรือไม่?")) return;
     setLoading(true);
@@ -66,7 +80,6 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
     }
   };
 
-  // เพิ่มรายการใหม่
   const handleAdd = async () => {
     if (!newCategory || !newDate || newAmount <= 0) {
       alert("กรุณากรอกข้อมูลครบถ้วนและจำนวนเงินมากกว่า 0");
@@ -77,9 +90,9 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
     try {
       const added = await createExpense({
         expense_type: newCategory,
-        expense_price: newAmount.toFixed(2), // แปลงเป็น string
+        expense_price: newAmount.toFixed(2),
         expense_date: newDate,
-        admin_id: "5779bb7e-5b77-4f0f-905b-4bde758059bf", // UUID admin จริง
+        admin_id: "5779bb7e-5b77-4f0f-905b-4bde758059bf",
       });
       onExpensesUpdate([...expenses, added]);
       setNewAmount(0);
@@ -95,6 +108,31 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
   return (
     <div className="space-y-4 p-4 bg-white rounded-lg shadow">
       <h3 className="font-semibold mb-2">รายจ่าย</h3>
+
+      {/* กรองเดือน/ปี */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <select
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(e.target.value)}
+          className="px-3 py-2 border rounded"
+        >
+          <option value="ทั้งหมด">ทั้งหมด (ปี)</option>
+          {years.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+
+        <select
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          className="px-3 py-2 border rounded"
+        >
+          <option value="ทั้งหมด">ทั้งหมด (เดือน)</option>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+      </div>
 
       {/* Form เพิ่มรายการ */}
       <div className="flex gap-2 mb-4">
@@ -127,7 +165,7 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
         </button>
       </div>
 
-      {/* ตารางรายจ่าย */}
+      {/* ตาราง */}
       <table className="w-full border-collapse border">
         <thead>
           <tr className="bg-gray-100">
@@ -138,7 +176,7 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
           </tr>
         </thead>
         <tbody>
-          {expenses.map((exp) => (
+          {filteredExpenses.map((exp) => (
             <tr key={exp.expense_id}>
               <td className="border px-2 py-1">
                 {editingId === exp.expense_id ? (
@@ -148,9 +186,7 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
                     onChange={(e) => setEditingDate(e.target.value)}
                     className="w-full border px-1 py-0.5 rounded"
                   />
-                ) : (
-                  exp.expense_date
-                )}
+                ) : exp.expense_date}
               </td>
               <td className="border px-2 py-1">
                 {editingId === exp.expense_id ? (
@@ -160,9 +196,7 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
                     onChange={(e) => setEditingAmount(Number(e.target.value))}
                     className="w-full border px-1 py-0.5 rounded"
                   />
-                ) : (
-                  Number(exp.expense_price).toLocaleString()
-                )}
+                ) : Number(exp.expense_price).toLocaleString()}
               </td>
               <td className="border px-2 py-1">
                 {editingId === exp.expense_id ? (
@@ -172,9 +206,7 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
                     onChange={(e) => setEditingCategory(e.target.value)}
                     className="w-full border px-1 py-0.5 rounded"
                   />
-                ) : (
-                  exp.expense_type
-                )}
+                ) : exp.expense_type}
               </td>
               <td className="border px-2 py-1 space-x-2">
                 {editingId === exp.expense_id ? (
@@ -204,6 +236,13 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
               </td>
             </tr>
           ))}
+          {filteredExpenses.length === 0 && (
+            <tr>
+              <td colSpan={4} className="text-center text-gray-500 py-4">
+                ไม่พบข้อมูลรายจ่าย
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
