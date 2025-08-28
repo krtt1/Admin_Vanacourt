@@ -229,12 +229,23 @@ export async function createPaymentAction(
     const payment: Payment = await handleFetch(`${BASE_URL}/payments/create`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify(data), // ✅ ส่ง payment_date ตาม form
     });
     return { success: true, payment };
   } catch (err: any) {
     return { success: false, message: err.message || "Cannot create payment" };
   }
+}
+
+// ดึง Stay ทั้งหมด สำหรับสร้าง Payment
+export async function getAllStaysForPayment(): Promise<Stay[]> {
+  const data = await handleFetch<Stay[]>(`${BASE_URL}/stays/getall`, { cache: "no-store" });
+  return data.map((s) => ({
+    ...s,
+    user_name: s.user_name ?? "Unknown User",
+    room_num: s.room_num ?? "Unknown Room",
+    room_price: s.room_price ?? 0, // เพิ่มค่า room_price เพื่อสร้างบิล
+  }));
 }
 
 

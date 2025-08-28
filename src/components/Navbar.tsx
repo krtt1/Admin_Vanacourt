@@ -3,11 +3,7 @@ import Image from "next/image"
 const Navbar = () => {
     return (
         <div className="flex items-cemter justify-between p-4">
-            {/* SEARCH BAR*/}
-            <div className="hidden md:flex items-center gap-2 tex-xs rounded-full ring-[1.5px] ring-gray-300 px-2">
-                <Image src="/search.png" alt="" width={14} height={14}/>
-                <input type="text" placeholder="Search..." className="w-[200px] p-2 bg-transparent outline-none"/>
-            </div>
+            
             {/* ICONS AND USER*/}
             <div className="flex items-center gap-6 justify-end w-full">
                 <div className="bg-white rounded-full w-7 h-7 flex items-center justify-center cursor-pointer">

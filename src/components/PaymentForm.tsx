@@ -49,7 +49,7 @@ const PaymentForm = ({ stay, adminId, adminUsername, billTypes, onSubmit, onCanc
       admin_id: adminId,
       water_amount: waterAmount,
       ele_amount: eleAmount,
-      payment_date: paymentDate,
+      payment_date: paymentDate, // ✅ ใช้ค่า string จาก input
       other_payment: otherPayment,
       other_payment_detail: otherPaymentDetail,
       status, // ✅ ส่งตาม state
