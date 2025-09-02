@@ -1,12 +1,15 @@
+// PaymentTable.tsx
 "use client";
 
 import { useState, useEffect } from "react";
-import { Stay, BillType, PaymentData, Payment, PaymentStatus } from "@/types/payment";
-import { 
-  getAllStaysForPayment, 
-  getAllBillTypes, 
-  createPaymentAction, 
-  getAllPayments 
+import { Stay, BillType, Payment, PaymentStatus, PaymentSlip } from "@/types/payment";
+import {
+  getAllStaysForPayment,
+  getAllBillTypes,
+  getAllPayments,
+  getSlipsByPayment,
+  createPaymentAction,
+  updatePaymentAction
 } from "@/app/(dashboard)/payment/paymentAction";
 import PaymentForm from "./PaymentForm";
 import StayPaymentList from "./StayPaymentList";
@@ -16,10 +19,13 @@ interface PaymentTableProps {
   adminUsername: string;
 }
 
+const BASE_URL = "http://localhost:5000";
+
 const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
   const [stays, setStays] = useState<Stay[]>([]);
   const [billTypes, setBillTypes] = useState<BillType[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentSlipsMap, setPaymentSlipsMap] = useState<Record<string, PaymentSlip[]>>({});
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedStay, setSelectedStay] = useState<Stay | null>(null);
@@ -27,14 +33,10 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
   const [loadingMap, setLoadingMap] = useState<{ [key: string]: boolean }>({});
   const [isLoading, setIsLoading] = useState(true);
 
-  // ดึง stays และ bill types
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [staysData, billTypesData] = await Promise.all([
-        getAllStaysForPayment(),
-        getAllBillTypes()
-      ]);
+      const [staysData, billTypesData] = await Promise.all([getAllStaysForPayment(), getAllBillTypes()]);
       setStays(staysData);
       setBillTypes(billTypesData);
     } finally {
@@ -42,11 +44,6 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // ดึง payments
   const fetchPayments = async () => {
     try {
       const allPayments = await getAllPayments();
@@ -55,34 +52,44 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
         return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
       });
       setPayments(filtered);
+
+      const slipsMap: Record<string, PaymentSlip[]> = {};
+      await Promise.all(
+        filtered.map(async (p) => {
+          const slips = await getSlipsByPayment(p.payment_id);
+          const validSlips: PaymentSlip[] = [];
+          for (const s of slips) {
+            try {
+              const res = await fetch(`${BASE_URL}${s.slip_url}`, { method: "HEAD" });
+              if (res.ok) validSlips.push(s);
+            } catch {}
+          }
+          slipsMap[p.payment_id] = validSlips;
+        })
+      );
+      setPaymentSlipsMap(slipsMap);
     } catch (err) {
       console.error(err);
       setPayments([]);
     }
   };
 
-  useEffect(() => {
-    fetchPayments();
-  }, [selectedMonth, selectedYear]);
+  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchPayments(); }, [selectedMonth, selectedYear]);
 
-  // สร้าง Payment ใหม่
-  const handleCreatePayment = async (paymentData: PaymentData) => {
+  const handleCreatePayment = async (paymentData: any) => {
     if (!selectedStay) return;
-
     setLoadingMap(prev => ({ ...prev, [selectedStay.stay_id]: true }));
     try {
-      const newPayment: PaymentData = {
-        ...paymentData,
-        stay_id: selectedStay.stay_id,
-        admin_id: adminId,
-        
+      const newPayment = { 
+        ...paymentData, 
+        stay_id: selectedStay.stay_id, 
+        admin_id: "5779bb7e-5b77-4f0f-905b-4bde758059bf" // ใช้ hardcode
       };
-      
       const res = await createPaymentAction(newPayment);
       if (!res.success) throw new Error(res.message);
-
       setSelectedStay(null);
-      await fetchPayments(); // รีเฟรช payments
+      await fetchPayments();
     } catch (err: any) {
       alert(err.message || "สร้างบิลไม่สำเร็จ");
     } finally {
@@ -94,13 +101,15 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
     setExpandedStayId(expandedStayId === stayId ? null : stayId);
   };
 
-  const getPaymentStatusByStay = (stayId: string) => {
-    const payment = payments.find(p => p.stay_id === stayId);
-    if (!payment) return "ยังไม่ได้สร้างบิล";
-    switch (payment.payment_status) {
-      case PaymentStatus.Paid: return "จ่ายแล้ว";
-      case PaymentStatus.Processing: return "กำลังดำเนินการ";
-      default: return "ยังไม่จ่าย";
+  const getStatusBadge = (status: PaymentStatus) => {
+    switch (status) {
+      case PaymentStatus.Paid:
+        return <span className="text-white bg-green-500 px-2 py-1 rounded">จ่ายแล้ว</span>;
+      case PaymentStatus.Processing:
+        return <span className="text-white bg-yellow-500 px-2 py-1 rounded">กำลังดำเนินการ</span>;
+      case PaymentStatus.Unpaid:
+      default:
+        return <span className="text-white bg-red-500 px-2 py-1 rounded">ยังไม่จ่าย</span>;
     }
   };
 
@@ -116,24 +125,13 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md mt-8">
+      {/* เลือกเดือน/ปี */}
       <div className="flex gap-2 mb-4">
-        <select
-          value={selectedMonth}
-          onChange={e => setSelectedMonth(Number(e.target.value))}
-          className="border rounded px-2 py-1"
-        >
-          {[...Array(12)].map((_, i) => (
-            <option key={i+1} value={i+1}>{i+1}</option>
-          ))}
+        <select value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} className="border rounded px-2 py-1">
+          {[...Array(12)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
         </select>
-        <select
-          value={selectedYear}
-          onChange={e => setSelectedYear(Number(e.target.value))}
-          className="border rounded px-2 py-1"
-        >
-          {[2023, 2024, 2025].map(y => (
-            <option key={y} value={y}>{y}</option>
-          ))}
+        <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="border rounded px-2 py-1">
+          {[2023, 2024, 2025].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>
 
@@ -145,18 +143,57 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
             <th className="py-3 px-6 text-left">วันที่เข้าพัก</th>
             <th className="py-3 px-6 text-left">สถานะเข้าพัก</th>
             <th className="py-3 px-6 text-left">สถานะบิล</th>
+            <th className="py-3 px-6 text-left">สลิป</th>
             <th className="py-3 px-6 text-center">จัดการ</th>
           </tr>
         </thead>
         <tbody>
-          {stays.map(stay => (
-            <>
+          {stays.map(stay => {
+            const stayPayments = payments.filter(p => p.stay_id === stay.stay_id);
+            return (
               <tr key={stay.stay_id} className="border-b border-gray-200 hover:bg-gray-50">
                 <td className="py-3 px-6">{stay.user_name}</td>
                 <td className="py-3 px-6">{stay.room_num}</td>
                 <td className="py-3 px-6">{stay.stay_date}</td>
                 <td className="py-3 px-6">{getStayStatusText(stay.stay_status)}</td>
-                <td className="py-3 px-6">{getPaymentStatusByStay(stay.stay_id)}</td>
+                <td className="py-3 px-6 flex items-center gap-2">
+                  {stayPayments.length > 0
+                    ? stayPayments.map(p => (
+                        <div key={p.payment_id} className="flex items-center gap-2">
+                          {getStatusBadge(p.payment_status)}
+                          {p.payment_status !== PaymentStatus.Paid && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const updated = { ...p, payment_status: PaymentStatus.Paid };
+                                  await updatePaymentAction(updated);
+                                  await fetchPayments();
+                                } catch (err: any) {
+                                  alert("ไม่สามารถยืนยันการชำระได้: " + err.message);
+                                }
+                              }}
+                              className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-xs"
+                            >
+                              จ่ายแล้ว
+                            </button>
+                          )}
+                        </div>
+                      ))
+                    : <span className="text-gray-500">ยังไม่ได้สร้างบิล</span>
+                  }
+                </td>
+                <td className="py-3 px-6">
+                  {stayPayments.map(p => paymentSlipsMap[p.payment_id]?.length
+                    ? paymentSlipsMap[p.payment_id].map((slip, idx) => (
+                        <div key={idx}>
+                          <a href={`${BASE_URL}${slip.slip_url}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">
+                            ดูสลิป
+                          </a>
+                        </div>
+                      ))
+                    : "ยังไม่มีสลิป"
+                  )}
+                </td>
                 <td className="py-3 px-6 text-center flex justify-center gap-2">
                   <button
                     onClick={() => setSelectedStay(stay)}
@@ -173,22 +210,27 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
                   </button>
                 </td>
               </tr>
+            );
+          })}
 
-              {expandedStayId === stay.stay_id && (
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <td colSpan={6} className="py-3 px-6">
+          {expandedStayId &&
+            stays
+              .filter(s => s.stay_id === expandedStayId)
+              .map(stay => (
+                <tr key={"expanded-" + stay.stay_id} className="bg-gray-50 border-b border-gray-200">
+                  <td colSpan={7} className="py-3 px-6">
                     <StayPaymentList
                       stay={stay}
                       adminId={adminId}
                       adminUsername={adminUsername}
                       onClose={() => setExpandedStayId(null)}
-                      refreshPayments={fetchPayments} // เพิ่ม prop สำหรับรีเฟรช
+                      refreshPayments={fetchPayments}
+                      payments={payments.filter(p => p.stay_id === stay.stay_id)}
+                      paymentSlips={paymentSlipsMap}
                     />
                   </td>
                 </tr>
-              )}
-            </>
-          ))}
+              ))}
         </tbody>
       </table>
 

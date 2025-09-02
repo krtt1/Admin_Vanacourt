@@ -101,3 +101,29 @@ export async function deleteStayAction(
     };
   }
 }
+
+// ดึง Stay ทั้งหมด
+export async function getAllStays(): Promise<Stay[]> {
+  const res = await fetch(`${BASE_URL}/stays/getall`);
+  if (!res.ok) throw new Error("ไม่สามารถดึงข้อมูล Stay ได้");
+  const data: Stay[] = await res.json();
+  return data.map((s) => ({
+    ...s,
+    user_name: s.user_name ?? "Unknown User",
+    room_num: s.room_num ?? "Unknown Room",
+  }));
+}
+
+// ดึงผู้เช่าทั้งหมด
+export async function getAllUsers(): Promise<{ user_id: string; user_name: string }[]> {
+  const res = await fetch(`${BASE_URL}/users/getall`);
+  if (!res.ok) throw new Error("ไม่สามารถดึงข้อมูล Users ได้");
+  return await res.json();
+}
+
+// ดึงห้องทั้งหมด
+export async function getAllRooms(): Promise<{ room_id: string; room_num: string }[]> {
+  const res = await fetch(`${BASE_URL}/rooms/getall`);
+  if (!res.ok) throw new Error("ไม่สามารถดึงข้อมูล Rooms ได้");
+  return await res.json();
+}

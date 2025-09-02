@@ -42,3 +42,28 @@ export async function deleteUserAction(userId: string) {
     return { success: false, message: error.message || "Failed to delete user." };
   }
 }
+
+// ----------------- Reset Password -----------------
+export async function resetUserPasswordAction(
+  userId: string,
+  username: string,   // เพิ่ม username
+  newPassword: string
+) {
+  try {
+    if (!newPassword) throw new Error("กรุณากรอกรหัสผ่านใหม่");
+    if (!username) throw new Error("ไม่พบชื่อผู้ใช้");
+
+    // สามารถใช้ username เพื่อ log หรือ confirm ก่อนอัปเดต
+    console.log(`Reset password for user: ${username} (ID: ${userId})`);
+
+    // เรียก updateUser และส่งแค่ user_password
+    const updatedUser = await updateUser(userId, { user_password: newPassword });
+
+    // revalidate หน้า users (ถ้าต้องการ)
+    revalidatePath("/users");
+
+    return { success: true, user: updatedUser };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Failed to reset password" };
+  }
+}

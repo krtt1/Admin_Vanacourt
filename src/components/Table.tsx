@@ -1,9 +1,9 @@
-// src/components/UsersTable.tsx
 "use client";
 
-import { useState, useEffect, FormEvent, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { User, UserFormData } from "@/types/user";
 import { createUser, updateUser, deleteUser } from "@/lib/api";
+import { resetUserPasswordAction } from "@/app/(dashboard)/user/user"; // server action
 import { useRouter } from "next/navigation";
 
 interface UsersTableProps {
@@ -11,10 +11,10 @@ interface UsersTableProps {
 }
 
 const UsersTable: React.FC<UsersTableProps> = ({ initialUsers }) => {
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  const [users, setUsers] = useState<User[]>(initialUsers || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchName, setSearchName] = useState(""); // สำหรับค้นหาชื่อ
+  const [searchName, setSearchName] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
@@ -24,12 +24,18 @@ const UsersTable: React.FC<UsersTableProps> = ({ initialUsers }) => {
     user_address: "",
     user_age: 0,
     user_password: "",
+    role: "",
   });
+
+  // สำหรับ Reset Password
+  const [resetUser, setResetUser] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState("");
 
   const router = useRouter();
 
+  // Update users state if initialUsers change
   useEffect(() => {
-    setUsers(initialUsers);
+    setUsers(initialUsers || []);
   }, [initialUsers]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,11 +54,12 @@ const UsersTable: React.FC<UsersTableProps> = ({ initialUsers }) => {
       user_address: "",
       user_age: 0,
       user_password: "",
+      role: "",
     });
     setEditingUser(null);
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -78,19 +85,19 @@ const UsersTable: React.FC<UsersTableProps> = ({ initialUsers }) => {
   const handleEdit = (user: User) => {
     setEditingUser(user);
     setFormData({
-      user_name: user.user_name,
-      user_username: user.user_username,
-      user_tel: user.user_tel,
-      user_address: user.user_address,
-      user_age: user.user_age,
+      user_name: user.user_name || "",
+      user_username: user.user_username || "",
+      user_tel: user.user_tel || "",
+      user_address: user.user_address || "",
+      user_age: user.user_age || 0,
       user_password: "",
+      role: user.role || "",
     });
     setShowForm(true);
   };
 
   const handleDelete = async (userId: string) => {
     if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบผู้ใช้นี้?")) return;
-
     setLoading(true);
     setError(null);
     try {
@@ -104,10 +111,28 @@ const UsersTable: React.FC<UsersTableProps> = ({ initialUsers }) => {
     }
   };
 
-  // กรองตามชื่อ
+  const handleResetPassword = async () => {
+    if (!resetUser) return;
+    if (!newPassword) return alert("กรุณากรอกรหัสผ่านใหม่");
+
+    setLoading(true);
+    try {
+      const res = await resetUserPasswordAction(resetUser.user_id, resetUser.user_username, newPassword);
+      if (!res.success) throw new Error(res.message);
+      alert(`รีเซ็ตรหัสผ่านสำเร็จสำหรับ ${resetUser.user_username}`);
+      setResetUser(null);
+      setNewPassword("");
+    } catch (err: any) {
+      alert(err.message || "เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // กรอง users โดยตรวจสอบ undefined
   const filteredUsers = useMemo(() => {
     return users.filter(u =>
-      u.user_name.toLowerCase().includes(searchName.toLowerCase())
+      (u.user_name || "").toLowerCase().includes(searchName.toLowerCase())
     );
   }, [users, searchName]);
 
@@ -207,6 +232,37 @@ const UsersTable: React.FC<UsersTableProps> = ({ initialUsers }) => {
         </div>
       )}
 
+      {/* Reset Password Modal */}
+      {resetUser && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+          <div className="bg-white p-6 rounded shadow-lg w-96">
+            <h3 className="text-lg font-semibold mb-2">รีเซ็ตรหัสผ่าน</h3>
+            <p className="mb-4">สำหรับผู้ใช้: <strong>{resetUser.user_username || resetUser.user_name}</strong></p>
+            <input
+              type="password"
+              placeholder="รหัสผ่านใหม่"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="border rounded py-2 px-3 w-full mb-4"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setResetUser(null)}
+                className="bg-gray-400 hover:bg-gray-600 text-white py-1 px-3 rounded"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleResetPassword}
+                className="bg-green-500 hover:bg-green-700 text-white py-1 px-3 rounded"
+              >
+                ยืนยัน
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white border border-gray-200">
@@ -223,17 +279,20 @@ const UsersTable: React.FC<UsersTableProps> = ({ initialUsers }) => {
           <tbody className="text-gray-600 text-sm font-light">
             {filteredUsers.map(user => (
               <tr key={user.user_id} className="border-b border-gray-200 hover:bg-gray-50">
-                <td className="py-3 px-6">{user.user_name}</td>
-                <td className="py-3 px-6">{user.user_username}</td>
-                <td className="py-3 px-6">{user.user_tel}</td>
-                <td className="py-3 px-6">{user.user_address}</td>
-                <td className="py-3 px-6">{user.user_age}</td>
+                <td className="py-3 px-6">{user.user_name || "-"}</td>
+                <td className="py-3 px-6">{user.user_username || "-"}</td>
+                <td className="py-3 px-6">{user.user_tel || "-"}</td>
+                <td className="py-3 px-6">{user.user_address || "-"}</td>
+                <td className="py-3 px-6">{user.user_age || 0}</td>
                 <td className="py-3 px-6 text-center flex justify-center gap-2">
                   <button onClick={() => handleEdit(user)} className="bg-yellow-500 hover:bg-yellow-700 text-white py-1 px-3 rounded text-xs">
                     แก้ไข
                   </button>
                   <button onClick={() => handleDelete(user.user_id)} className="bg-red-500 hover:bg-red-700 text-white py-1 px-3 rounded text-xs">
                     ลบ
+                  </button>
+                  <button onClick={() => setResetUser(user)} className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-3 rounded text-xs">
+                    Reset Password
                   </button>
                 </td>
               </tr>
