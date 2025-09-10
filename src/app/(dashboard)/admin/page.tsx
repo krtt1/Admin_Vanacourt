@@ -9,7 +9,7 @@ import { getAllUsers, getAllRooms, getAllRepairs } from "@/lib/api";
 import { useEffect, useState } from "react";
 
 const AdminPage = () => {
-  const adminId = "5779bb7e-5b77-4f0f-905b-4bde758059bf"; // <-- ใส่ adminId แบบ hardcode
+  const adminId = "5779bb7e-5b77-4f0f-905b-4bde758059bf";
 
   const [totalTenants, setTotalTenants] = useState(0);
   const [availableRooms, setAvailableRooms] = useState(0);
@@ -19,16 +19,13 @@ const AdminPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Users
         const users = await getAllUsers();
         setTotalTenants(users?.length || 0);
 
-        // Rooms
         const rooms = await getAllRooms();
         setAvailableRooms(rooms?.filter(r => r.room_status === "0").length || 0);
         setOccupiedRooms(rooms?.filter(r => r.room_status !== "0").length || 0);
 
-        // Repairs
         const repairs = await getAllRepairs();
         setTotalRepairRequests(repairs?.length || 0);
       } catch (err) {
@@ -44,10 +41,22 @@ const AdminPage = () => {
       {/* LEFT Section: Cards */}
       <div className="w-full lg:w-2/3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
-          <UserCard type="ผู้เช่าทั้งหมด" count={totalTenants}/>
-          <RoomCard type="ห้องว่าง" count={availableRooms}/>
-          <RoomCard type="ห้องไม่ว่าง" count={occupiedRooms}/>
-          <RepairCard type="รายการซ่อม" count={totalRepairRequests}/>
+          <UserCard type="ผู้เช่าทั้งหมด" count={totalTenants} />
+          <RoomCard type="ห้องว่าง" count={availableRooms} />
+          <RoomCard type="ห้องไม่ว่าง" count={occupiedRooms} />
+          <RepairCard type="รายการซ่อม" count={totalRepairRequests} />
+        </div>
+
+        {/* ปุ่มเปิด PDF */}
+        <div className="mt-6">
+          <a
+            href="/rules.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-300"
+          >
+            📄 สัญญาเช่า
+          </a>
         </div>
       </div>
 

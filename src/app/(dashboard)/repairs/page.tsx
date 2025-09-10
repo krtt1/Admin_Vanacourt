@@ -27,17 +27,7 @@ const RepairsPage = async () => {
         <h1 className="hidden md:block text-lg font-semibold">All Repairs</h1>
         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
           
-          <div className="flex items-center gap-4 self-end">
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <Image src="/filter.png" alt="Filter Icon" width={14} height={14}/>
-            </button>
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <Image src="/sort.png" alt="Sort Icon" width={14} height={14}/>
-            </button>
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <Image src="/plus.png" alt="Add Icon" width={14} height={14}/>
-            </button>
-          </div>
+          
         </div>
       </div>
 
@@ -45,7 +35,7 @@ const RepairsPage = async () => {
       <RepairsTable initialRepairs={initialRepairs} rooms={rooms} /> {/* ส่ง rooms ด้วย */}
 
       {/* PAGINATION */}
-      <Pagination/>
+      
     </div>
   );
 };

@@ -65,7 +65,7 @@ const StayPage = async () => {
       />
 
       {/* PAGINATION */}
-      <Pagination />
+      
     </div>
   );
 };
