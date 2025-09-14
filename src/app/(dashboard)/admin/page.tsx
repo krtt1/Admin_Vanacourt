@@ -47,17 +47,7 @@ const AdminPage = () => {
           <RepairCard type="รายการซ่อม" count={totalRepairRequests} />
         </div>
 
-        {/* ปุ่มเปิด PDF */}
-        <div className="mt-6">
-          <a
-            href="/rules.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-300"
-          >
-            📄 สัญญาเช่า
-          </a>
-        </div>
+        
       </div>
 
       {/* RIGHT Section: Calendar + Announcements */}

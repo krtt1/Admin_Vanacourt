@@ -1,101 +1,243 @@
 "use client";
 
-import { useState } from "react";
-import { Income } from "@/types/finance";
+import { useEffect, useState } from "react";
 
-interface Props {
-  incomes: Income[];
-  onIncomesUpdate: (incomes: Income[]) => void;
+export interface IncomeItem {
+  income_id: string;
+  income_amount: number;
+  income_date: string;
+  income_type: "room" | "other";
+  description?: string;
 }
 
-const IncomeTable = ({ incomes }: Props) => {
-  const [selectedYear, setSelectedYear] = useState<string>("ทั้งหมด");
-  const [selectedMonth, setSelectedMonth] = useState<string>("ทั้งหมด");
+export interface Payment {
+  payment_id: string;
+  stay_id: string;
+  admin_name: string;
+  user_id: string;
+  user_name: string;
+  room_num: string;
+  water_amount: string;
+  water_price: string;
+  ele_amount: string;
+  ele_price: string;
+  other_payment?: string;
+  other_payment_detail?: string;
+  payment_total: string;
+  payment_date: string;
+  payment_status: string;
+}
 
-  // ดึงปีที่มีอยู่ในข้อมูล (ไม่ซ้ำ)
-  const years = Array.from(
-    new Set(incomes.map((i) => new Date(i.income_date).getFullYear()))
-  ).sort((a, b) => b - a); // เรียงจากใหม่ -> เก่า
+const BASE_URL = "http://localhost:5000";
+const PAYMENTS_PER_PAGE = 10;
 
-  // ฟิลเตอร์ข้อมูลตามปี & เดือน
-  const filteredIncomes = incomes.filter((i) => {
-    const incomeDate = new Date(i.income_date);
-    const year = incomeDate.getFullYear();
-    const month = incomeDate.getMonth() + 1;
+const IncomeTable = () => {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [incomeItems, setIncomeItems] = useState<IncomeItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
-    if (selectedYear !== "ทั้งหมด" && year !== Number(selectedYear)) return false;
-    if (selectedMonth !== "ทั้งหมด" && month !== Number(selectedMonth)) return false;
+  // Filter states
+  const [filterMonth, setFilterMonth] = useState<string>("");
+  const [filterYear, setFilterYear] = useState<string>("");
+  const [filterType, setFilterType] = useState<"all" | "room" | "other">("all");
 
-    return true;
-  });
+  useEffect(() => {
+    const fetchPayments = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/payments/getall`);
+        if (!res.ok) throw new Error("Fetch payments failed");
+        const data: Payment[] = await res.json();
+        setPayments(data);
+      } catch (err: any) {
+        console.error("Fetch payments error:", err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPayments();
+  }, []);
+
+  useEffect(() => {
+    const items: IncomeItem[] = payments.flatMap((p) => {
+      const arr: IncomeItem[] = [];
+
+      const roomAmount =
+        parseFloat(p.payment_total) -
+        (p.other_payment ? parseFloat(p.other_payment) : 0);
+
+      if (roomAmount > 0) {
+        arr.push({
+          income_id: p.payment_id + "-room",
+          income_date: p.payment_date,
+          income_type: "room",
+          income_amount: roomAmount,
+          description: `ห้อง ${p.room_num} (${p.user_name})`,
+        });
+      }
+
+      if (p.other_payment && parseFloat(p.other_payment) > 0) {
+        arr.push({
+          income_id: p.payment_id + "-other",
+          income_date: p.payment_date,
+          income_type: "other",
+          income_amount: parseFloat(p.other_payment),
+          description: p.other_payment_detail,
+        });
+      }
+
+      return arr;
+    });
+
+    // Apply filters
+    const filtered = items.filter((item) => {
+      const date = new Date(item.income_date);
+      const monthMatch = filterMonth ? date.getMonth() + 1 === parseInt(filterMonth) : true;
+      const yearMatch = filterYear ? date.getFullYear() === parseInt(filterYear) : true;
+      const typeMatch = filterType !== "all" ? item.income_type === filterType : true;
+      return monthMatch && yearMatch && typeMatch;
+    });
+
+    setIncomeItems(filtered);
+    setCurrentPage(1);
+  }, [payments, filterMonth, filterYear, filterType]);
+
+  const totalPages = Math.ceil(incomeItems.length / PAYMENTS_PER_PAGE);
+  const currentItems = incomeItems.slice(
+    (currentPage - 1) * PAYMENTS_PER_PAGE,
+    currentPage * PAYMENTS_PER_PAGE
+  );
+
+  const totalIncome = incomeItems.reduce((sum, item) => sum + item.income_amount, 0);
+
+  if (loading) return <div className="p-4">Loading...</div>;
 
   return (
-    <div className="mt-6 bg-white shadow-md rounded-lg p-4">
-      <h2 className="text-lg font-semibold mb-4 text-center">ข้อมูลรายรับ</h2>
+    <div className="bg-white p-4 rounded shadow-lg mt-4 max-h-[600px] overflow-y-auto">
+      <h2 className="text-xl font-bold mb-4">รายรับ</h2>
 
-      {/* === ตัวเลือกกรองข้อมูล === */}
-      <div className="flex flex-wrap gap-4 justify-center mb-4">
-        {/* เลือกปี */}
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
-          className="px-3 py-2 border rounded-lg shadow-sm focus:ring focus:ring-blue-300"
-        >
-          <option value="ทั้งหมด">ทั้งหมด (ปี)</option>
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4 mb-4 items-center">
+        <div>
+          <label className="mr-2 text-sm font-semibold">เดือน:</label>
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            className="border border-gray-300 rounded px-2 py-1 text-sm"
+          >
+            <option value="">ทั้งหมด</option>
+            {Array.from({ length: 12 }, (_, i) => (
+              <option key={i + 1} value={i + 1}>
+                {i + 1}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        {/* เลือกเดือน */}
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="px-3 py-2 border rounded-lg shadow-sm focus:ring focus:ring-blue-300"
-        >
-          <option value="ทั้งหมด">ทั้งหมด (เดือน)</option>
-          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-            <option key={m} value={m}>
-              เดือน {m}
-            </option>
-          ))}
-        </select>
+        <div>
+          <label className="mr-2 text-sm font-semibold">ปี:</label>
+          <input
+            type="number"
+            value={filterYear}
+            onChange={(e) => setFilterYear(e.target.value)}
+            placeholder="เช่น 2025"
+            className="border border-gray-300 rounded px-2 py-1 text-sm w-20"
+          />
+        </div>
+
+        <div>
+          <label className="mr-2 text-sm font-semibold">ประเภท:</label>
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as any)}
+            className="border border-gray-300 rounded px-2 py-1 text-sm"
+          >
+            <option value="all">ทั้งหมด</option>
+            <option value="room">ค่าห้อง</option>
+            <option value="other">อื่น ๆ</option>
+          </select>
+        </div>
       </div>
 
-      {/* === ตารางข้อมูลรายรับ === */}
-      <div className="overflow-x-auto">
-        <table className="w-full border border-gray-200 rounded-lg text-center">
-          <thead>
-            <tr className="bg-gray-100 text-gray-700">
-              <th className="py-3 px-4 border">จำนวนเงิน</th>
-              <th className="py-3 px-4 border">วันที่</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredIncomes.length > 0 ? (
-              filteredIncomes.map((i) => (
-                <tr
-                  key={i.income_id}
-                  className="hover:bg-gray-50 transition duration-150"
-                >
-                  <td className="py-2 px-4 border">
-                    {i.income_amount.toLocaleString()} บาท
-                  </td>
-                  <td className="py-2 px-4 border">{i.income_date}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={2} className="text-center text-gray-500 py-4">
-                  ไม่พบข้อมูลรายรับ
-                </td>
+      {incomeItems.length === 0 ? (
+        <p>ยังไม่มีข้อมูลรายรับ</p>
+      ) : (
+        <>
+          <table className="min-w-full border border-gray-200 text-sm">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="py-2 px-3 text-left">วันที่</th>
+                <th className="py-2 px-3 text-left">ประเภท</th>
+                <th className="py-2 px-3 text-left">รายละเอียด</th>
+                <th className="py-2 px-3 text-right">จำนวนเงิน</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {currentItems.map((item) => (
+                <tr
+                  key={item.income_id}
+                  className={`border-b border-gray-200 hover:bg-gray-50 ${
+                    item.income_type === "room" ? "bg-green-50" : "bg-yellow-50"
+                  }`}
+                >
+                  <td className="py-2 px-3">{item.income_date}</td>
+                  <td className="py-2 px-3 font-semibold">
+                    {item.income_type === "room" ? "ค่าห้อง" : "อื่น ๆ"}
+                  </td>
+                  <td className="py-2 px-3">{item.description}</td>
+                  <td className="py-2 px-3 text-right">
+                    {item.income_amount.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center gap-2 mt-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-2 py-1 bg-gray-200 rounded disabled:opacity-50"
+              >
+                ก่อนหน้า
+              </button>
+              {[...Array(totalPages)].map((_, i) => (
+                <button
+                  key={i + 1}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`px-2 py-1 rounded ${
+                    currentPage === i + 1 ? "bg-blue-500 text-white" : "bg-gray-200"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-2 py-1 bg-gray-200 rounded disabled:opacity-50"
+              >
+                ถัดไป
+              </button>
+            </div>
+          )}
+
+          {/* Total */}
+          <div className="mt-4 font-bold text-right">
+            รวมทั้งหมด:{" "}
+            {totalIncome.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 };

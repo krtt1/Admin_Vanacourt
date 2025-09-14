@@ -33,9 +33,9 @@ const FinancePage = () => {
   return (
     <div className="space-y-6 p-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <FinancialCard title="รายรับเดือนนี้" amount={incomes.reduce((sum,i)=>sum+Number(i.income_amount),0)} color="green" />
-        <FinancialCard title="รายจ่ายเดือนนี้" amount={expenses.reduce((sum,e)=>sum+Number(e.expense_price),0)} color="pink" />
-        <FinancialCard title="ยอดปีนี้" amount={balance} color="orange" />
+        <FinancialCard title="รายรับทั้งหมด" amount={incomes.reduce((sum,i)=>sum+Number(i.income_amount),0)} color="green" />
+        <FinancialCard title="รายจ่ายทั้งหมด" amount={expenses.reduce((sum,e)=>sum+Number(e.expense_price),0)} color="pink" />
+        <FinancialCard title="ยอดสุทธิ" amount={balance} color="orange" />
       </div>
 
       <div className="h-96">

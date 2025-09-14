@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Stay, BillType, PaymentData } from "@/types/payment";
+import { Stay, BillType, PaymentData, PaymentStatus } from "@/types/payment";
 
 interface PaymentFormProps {
   stay: Stay;
@@ -18,13 +18,12 @@ const PaymentForm = ({ stay, adminId, adminUsername, billTypes, onSubmit, onCanc
   const [otherPayment, setOtherPayment] = useState<number>(0);
   const [otherPaymentDetail, setOtherPaymentDetail] = useState<string>("");
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split("T")[0]);
-  const [status, setStatus] = useState<string>('1'); // ✅ defaultValue
+  const [status, setStatus] = useState<PaymentStatus>(PaymentStatus.Unpaid); // ✅ ใช้ enum
   const [step, setStep] = useState<1 | 2>(1);
 
-  const statusMap: Record<string, string> = {
-    "0": "ค้างชำระ",
-    "1": "กำลังดำเนินการ",
-    "2": "ชำระแล้ว",
+  const statusMap: Record<PaymentStatus, string> = {
+    [PaymentStatus.Unpaid]: "ยังไม่จ่าย",
+    [PaymentStatus.Paid]: "จ่ายแล้ว",
   };
 
   const waterPrice = billTypes.find(b => b.bill_type.includes("น้ำ"))?.billtype_price || 0;
@@ -49,10 +48,10 @@ const PaymentForm = ({ stay, adminId, adminUsername, billTypes, onSubmit, onCanc
       admin_id: adminId,
       water_amount: waterAmount,
       ele_amount: eleAmount,
-      payment_date: paymentDate, // ✅ ใช้ค่า string จาก input
+      payment_date: paymentDate,
       other_payment: otherPayment,
       other_payment_detail: otherPaymentDetail,
-      status, // ✅ ส่งตาม state
+      status, // ✅ ส่ง enum
     };
     onSubmit(paymentData);
   };
@@ -89,6 +88,18 @@ const PaymentForm = ({ stay, adminId, adminUsername, billTypes, onSubmit, onCanc
             <label className="block mt-2">
               วันที่เรียกชำระ:
               <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="border rounded w-full mt-1 px-2 py-1" />
+            </label>
+
+            <label className="block mt-2">
+              สถานะ:
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as PaymentStatus)}
+                className="border rounded w-full mt-1 px-2 py-1"
+              >
+                <option value={PaymentStatus.Unpaid}>ยังไม่จ่าย</option>
+                <option value={PaymentStatus.Paid}>จ่ายแล้ว</option>
+              </select>
             </label>
 
             <div className="flex justify-end gap-2 mt-4">

@@ -248,6 +248,11 @@ export async function getAllStaysForPayment(): Promise<Stay[]> {
   }));
 }
 
+// ดึง Payment ทั้งหมด
+export const getAllPayments = async (): Promise<Payment[]> => {
+  return handleFetch<Payment[]>(`${BASE_URL}/payments/getall`, { cache: "no-store" });
+};
+
 
 
 // ==================== FINANCIAL / EXPENSE ====================
@@ -330,6 +335,58 @@ export const getYearEndBalance = async (year: number): Promise<number> => {
   );
   return (Number(incomes.total) || 0) - (Number(expenses.total) || 0);
 };
+
+export interface PaymentIncome {
+  income_id: string;
+  payment_id: string;
+  income_type: 'room' | 'other';
+  income_amount: number;
+  income_date: string;
+  income_description: string;
+}
+
+export const getIncomesFromPayments = async (): Promise<PaymentIncome[]> => {
+  // ดึง payment ทั้งหมด (status = 2)
+  const payments = await getAllPayments();
+
+  const incomes: PaymentIncome[] = [];
+
+  payments.forEach((p) => {
+    const roomTotal =
+      (p.room_price || 0) +
+      (p.water_price ? Number(p.water_price) : 0) +
+      (p.ele_price ? Number(p.ele_price) : 0);
+
+    if (roomTotal > 0) {
+      incomes.push({
+        income_id: crypto.randomUUID(),
+        payment_id: p.payment_id,
+        income_type: 'room',
+        income_amount: roomTotal,
+        income_date: p.payment_date,
+        income_description: 'ค่าห้อง + ค่าน้ำ + ค่าไฟ',
+      });
+    }
+
+    if (p.other_payment && Number(p.other_payment) > 0) {
+      incomes.push({
+        income_id: crypto.randomUUID(),
+        payment_id: p.payment_id,
+        income_type: 'other',
+        income_amount: Number(p.other_payment),
+        income_date: p.payment_date,
+        income_description: p.other_payment_detail || 'ค่าใช้จ่ายอื่น',
+      });
+    }
+  });
+
+  return incomes;
+};
+
+
+
+
+
 
 // ดึง Notification ของ user หรือ admin
 export const getNotifications = async (userId?: string, adminId?: string): Promise<NotificationItem[]> => {

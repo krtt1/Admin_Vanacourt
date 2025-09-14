@@ -5,9 +5,10 @@ const menuItems = [
   {
     title: "MENU",
     items: [
+      { icon: "/agreement.png", label: "Agreement", href: "/agreement" },
       { icon: "/dashboard.png", label: "Dashboard", href: "/admin" },
       { icon: "/payment.png", label: "Payments", href: "/payment" },
-      { icon: "/payment.png", label: "Stay Management", href: "/stay" },
+      { icon: "/stay.png", label: "Stay Management", href: "/stay" },
       { icon: "/student.png", label: "User", href: "/user" },
       { icon: "/repairs.png", label: "Repairs", href: "/repairs" },
       { icon: "/income.png", label: "Income and Expenses", href: "/finance" },
@@ -18,7 +19,7 @@ const menuItems = [
   {
     title: "OTHER",
     items: [
-      { icon: "/setting.png", label: "Settings", href: "/settings" },
+      
       { icon: "/logout.png", label: "Logout", href: "/sign-in" },
     ],
   },

@@ -1,4 +1,3 @@
-// PaymentTable.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -25,6 +24,7 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
   const [stays, setStays] = useState<Stay[]>([]);
   const [billTypes, setBillTypes] = useState<BillType[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [allStayPaymentsMap, setAllStayPaymentsMap] = useState<Record<string, Payment[]>>({});
   const [paymentSlipsMap, setPaymentSlipsMap] = useState<Record<string, PaymentSlip[]>>({});
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -55,7 +55,7 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
 
       const slipsMap: Record<string, PaymentSlip[]> = {};
       await Promise.all(
-        filtered.map(async (p) => {
+        allPayments.map(async (p) => {
           const slips = await getSlipsByPayment(p.payment_id);
           const validSlips: PaymentSlip[] = [];
           for (const s of slips) {
@@ -74,8 +74,23 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
-  useEffect(() => { fetchPayments(); }, [selectedMonth, selectedYear]);
+  // ดึงบิลทั้งหมดของ stay
+  const fetchAllStayPayments = async (stayId: string) => {
+    const allPayments = await getAllPayments();
+    const stayPayments = allPayments.filter(p => p.stay_id === stayId);
+    setAllStayPaymentsMap(prev => ({ ...prev, [stayId]: stayPayments }));
+  };
+
+  const toggleExpand = async (stayId: string) => {
+    if (expandedStayId === stayId) {
+      setExpandedStayId(null);
+      return;
+    }
+    if (!allStayPaymentsMap[stayId]) {
+      await fetchAllStayPayments(stayId);
+    }
+    setExpandedStayId(stayId);
+  };
 
   const handleCreatePayment = async (paymentData: any) => {
     if (!selectedStay) return;
@@ -84,7 +99,7 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
       const newPayment = { 
         ...paymentData, 
         stay_id: selectedStay.stay_id, 
-        admin_id: "5779bb7e-5b77-4f0f-905b-4bde758059bf" // ใช้ hardcode
+        admin_id: adminId
       };
       const res = await createPaymentAction(newPayment);
       if (!res.success) throw new Error(res.message);
@@ -95,10 +110,6 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
     } finally {
       setLoadingMap(prev => ({ ...prev, [selectedStay!.stay_id]: false }));
     }
-  };
-
-  const toggleExpand = (stayId: string) => {
-    setExpandedStayId(expandedStayId === stayId ? null : stayId);
   };
 
   const getStatusBadge = (status: PaymentStatus) => {
@@ -120,6 +131,9 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
       default: return "-";
     }
   };
+
+  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchPayments(); }, [selectedMonth, selectedYear]);
 
   if (isLoading) return <p>กำลังโหลดข้อมูล...</p>;
 
@@ -161,22 +175,6 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
                     ? stayPayments.map(p => (
                         <div key={p.payment_id} className="flex items-center gap-2">
                           {getStatusBadge(p.payment_status)}
-                          {p.payment_status !== PaymentStatus.Paid && (
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const updated = { ...p, payment_status: PaymentStatus.Paid };
-                                  await updatePaymentAction(updated);
-                                  await fetchPayments();
-                                } catch (err: any) {
-                                  alert("ไม่สามารถยืนยันการชำระได้: " + err.message);
-                                }
-                              }}
-                              className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-xs"
-                            >
-                              จ่ายแล้ว
-                            </button>
-                          )}
                         </div>
                       ))
                     : <span className="text-gray-500">ยังไม่ได้สร้างบิล</span>
@@ -195,6 +193,7 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
                   )}
                 </td>
                 <td className="py-3 px-6 text-center flex justify-center gap-2">
+                  {/* สร้างใบชำระ */}
                   <button
                     onClick={() => setSelectedStay(stay)}
                     disabled={loadingMap[stay.stay_id]}
@@ -202,12 +201,34 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
                   >
                     {loadingMap[stay.stay_id] ? "กำลังสร้าง..." : "สร้างใบชำระ"}
                   </button>
+
+                  {/* ดูสถานะบิล */}
                   <button
                     onClick={() => toggleExpand(stay.stay_id)}
                     className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded text-xs"
                   >
                     {expandedStayId === stay.stay_id ? "ซ่อนสถานะ" : "ดูสถานะบิล"}
                   </button>
+
+                  {/* จ่ายแล้ว */}
+                  {stayPayments.some(p => p.payment_status !== PaymentStatus.Paid) && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          for (const p of stayPayments.filter(p => p.payment_status !== PaymentStatus.Paid)) {
+                            const updated = { ...p, payment_status: PaymentStatus.Paid };
+                            await updatePaymentAction(updated);
+                          }
+                          await fetchPayments();
+                        } catch (err: any) {
+                          alert("ไม่สามารถยืนยันการชำระได้: " + err.message);
+                        }
+                      }}
+                      className="bg-blue-600 hover:bg-blue-800 text-white font-bold py-1 px-3 rounded text-xs"
+                    >
+                      อัพเดทสถานะบิล
+                    </button>
+                  )}
                 </td>
               </tr>
             );
@@ -225,7 +246,7 @@ const PaymentTable = ({ adminId, adminUsername }: PaymentTableProps) => {
                       adminUsername={adminUsername}
                       onClose={() => setExpandedStayId(null)}
                       refreshPayments={fetchPayments}
-                      payments={payments.filter(p => p.stay_id === stay.stay_id)}
+                      payments={allStayPaymentsMap[stay.stay_id] || []} // ดึงบิลทั้งหมด
                       paymentSlips={paymentSlipsMap}
                     />
                   </td>

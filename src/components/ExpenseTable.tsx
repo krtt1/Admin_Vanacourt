@@ -13,27 +13,39 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingAmount, setEditingAmount] = useState<number>(0);
   const [editingCategory, setEditingCategory] = useState<string>("");
-  const [editingDate, setEditingDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [editingDate, setEditingDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
   const [loading, setLoading] = useState(false);
 
   const [newAmount, setNewAmount] = useState<number>(0);
   const [newCategory, setNewCategory] = useState<string>("");
-  const [newDate, setNewDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [newDate, setNewDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
 
-  // ตัวกรอง
-  const [selectedYear, setSelectedYear] = useState<string>("ทั้งหมด");
-  const [selectedMonth, setSelectedMonth] = useState<string>("ทั้งหมด");
+  // Filter state
+  const [filterMonth, setFilterMonth] = useState<string>("");
+  const [filterYear, setFilterYear] = useState<string>("");
+  const [filterCategory, setFilterCategory] = useState<string>("");
 
   // ดึงปีจากข้อมูล
-  const years = Array.from(new Set(expenses.map((e) => new Date(e.expense_date).getFullYear()))).sort((a, b) => b - a);
+  const years = Array.from(
+    new Set(expenses.map((e) => new Date(e.expense_date).getFullYear()))
+  ).sort((a, b) => b - a);
 
-  // ฟิลเตอร์ตามปี/เดือน
+  const categories = Array.from(new Set(expenses.map((e) => e.expense_type)));
+
+  // Filtered expenses
   const filteredExpenses = expenses.filter((e) => {
     const d = new Date(e.expense_date);
     const year = d.getFullYear();
     const month = d.getMonth() + 1;
-    if (selectedYear !== "ทั้งหมด" && year !== Number(selectedYear)) return false;
-    if (selectedMonth !== "ทั้งหมด" && month !== Number(selectedMonth)) return false;
+
+    if (filterYear && year !== Number(filterYear)) return false;
+    if (filterMonth && month !== Number(filterMonth)) return false;
+    if (filterCategory && e.expense_type !== filterCategory) return false;
+
     return true;
   });
 
@@ -107,31 +119,38 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
 
   return (
     <div className="space-y-4 p-4 bg-white rounded-lg shadow">
-      <h3 className="font-semibold mb-2">รายจ่าย</h3>
+      <h3 className="font-semibold mb-2 text-xl">รายจ่าย</h3>
 
-      {/* กรองเดือน/ปี */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
-          className="px-3 py-2 border rounded"
-        >
-          <option value="ทั้งหมด">ทั้งหมด (ปี)</option>
-          {years.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
+      {/* Filter เดือน / ปี / ประเภท */}
+      <div className="flex flex-wrap gap-4 mb-4 items-center">
+        <div>
+          <label className="mr-2 text-sm font-semibold">เดือน:</label>
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            className="border border-gray-300 rounded px-2 py-1 text-sm"
+          >
+            <option value="">ทั้งหมด</option>
+            {Array.from({ length: 12 }, (_, i) => (
+              <option key={i + 1} value={i + 1}>
+                {i + 1}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="px-3 py-2 border rounded"
-        >
-          <option value="ทั้งหมด">ทั้งหมด (เดือน)</option>
-          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </select>
+        <div>
+          <label className="mr-2 text-sm font-semibold">ปี:</label>
+          <input
+            type="number"
+            value={filterYear}
+            onChange={(e) => setFilterYear(e.target.value)}
+            placeholder="เช่น 2025"
+            className="border border-gray-300 rounded px-2 py-1 text-sm w-20"
+          />
+        </div>
+
+      
       </div>
 
       {/* Form เพิ่มรายการ */}
@@ -166,19 +185,19 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
       </div>
 
       {/* ตาราง */}
-      <table className="w-full border-collapse border">
+      <table className="min-w-full border border-gray-200 text-sm">
         <thead>
           <tr className="bg-gray-100">
-            <th className="border px-2 py-1">วันที่</th>
-            <th className="border px-2 py-1">จำนวนเงิน</th>
-            <th className="border px-2 py-1">ประเภท</th>
-            <th className="border px-2 py-1">Action</th>
+            <th className="py-2 px-3 text-left">วันที่</th>
+            <th className="py-2 px-3 text-right">จำนวนเงิน</th>
+            <th className="py-2 px-3 text-left">ประเภท</th>
+            <th className="py-2 px-3 text-left">Action</th>
           </tr>
         </thead>
         <tbody>
           {filteredExpenses.map((exp) => (
-            <tr key={exp.expense_id}>
-              <td className="border px-2 py-1">
+            <tr key={exp.expense_id} className="border-b border-gray-200 hover:bg-gray-50">
+              <td className="py-2 px-3">
                 {editingId === exp.expense_id ? (
                   <input
                     type="date"
@@ -186,9 +205,11 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
                     onChange={(e) => setEditingDate(e.target.value)}
                     className="w-full border px-1 py-0.5 rounded"
                   />
-                ) : exp.expense_date}
+                ) : (
+                  exp.expense_date
+                )}
               </td>
-              <td className="border px-2 py-1">
+              <td className="py-2 px-3 text-right">
                 {editingId === exp.expense_id ? (
                   <input
                     type="number"
@@ -196,9 +217,11 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
                     onChange={(e) => setEditingAmount(Number(e.target.value))}
                     className="w-full border px-1 py-0.5 rounded"
                   />
-                ) : Number(exp.expense_price).toLocaleString()}
+                ) : (
+                  Number(exp.expense_price).toLocaleString()
+                )}
               </td>
-              <td className="border px-2 py-1">
+              <td className="py-2 px-3">
                 {editingId === exp.expense_id ? (
                   <input
                     type="text"
@@ -206,9 +229,11 @@ const ExpenseTable = ({ expenses, onExpensesUpdate }: Props) => {
                     onChange={(e) => setEditingCategory(e.target.value)}
                     className="w-full border px-1 py-0.5 rounded"
                   />
-                ) : exp.expense_type}
+                ) : (
+                  exp.expense_type
+                )}
               </td>
-              <td className="border px-2 py-1 space-x-2">
+              <td className="py-2 px-3 space-x-2">
                 {editingId === exp.expense_id ? (
                   <button
                     disabled={loading}

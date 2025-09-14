@@ -17,8 +17,7 @@ export interface BillType {
 }
 
 export enum PaymentStatus {
-  Unpaid = "0",
-  Processing = "1",
+  Unpaid = "1",
   Paid = "2",
 }
 
@@ -33,6 +32,9 @@ export interface Payment {
   payment_date: string;
   payment_status: PaymentStatus;
   payment_total: number;
+  room_price?: number;
+  user_name?: string;
+  room_num?: string;
 }
 
 export interface PaymentData {
