@@ -32,7 +32,10 @@ const StayTable: React.FC<StayTableProps> = ({ initialStays = [], users = [], ro
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === "stay_status" ? Number(value) : value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === "stay_status" ? Number(value) : value || ""
+    }));
   };
 
   const resetForm = () => {
@@ -48,12 +51,14 @@ const StayTable: React.FC<StayTableProps> = ({ initialStays = [], users = [], ro
 
   const handleEdit = (stay: Stay) => {
     setEditingStay(stay);
+    const userId = users.find(u => u.user_name === stay.user_name)?.user_id || "";
+    const roomId = rooms.find(r => r.room_num === stay.room_num)?.room_id || "";
     setFormData({
       stay_date: stay.stay_date,
       stay_status: stay.stay_status,
       stay_dateout: stay.stay_dateout || "",
-      user_id: stay.user_name || "",
-      room_id: stay.room_num || "",
+      user_id: userId,
+      room_id: roomId,
     });
     setShowForm(true);
   };
@@ -76,37 +81,52 @@ const StayTable: React.FC<StayTableProps> = ({ initialStays = [], users = [], ro
     }
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      let res;
-      const payload = { ...formData };
-      if (!editingStay) delete payload.stay_dateout; // เอา stay_dateout ออกสำหรับเพิ่มใหม่
-      if (editingStay) {
-        res = await updateStayAction(editingStay.stay_id, payload);
-        if (res.success) {
-          setStays(prev => prev.map(s => s.stay_id === res.stay!.stay_id ? res.stay! : s));
-        }
-      } else {
-        res = await addStayAction(payload);
-        if (res.success) {
-          setStays(prev => [...prev, res.stay!]);
-        }
-      }
-      if (res.success) {
-        setShowForm(false);
-        resetForm();
-      } else {
-        throw new Error(res.message);
-      }
-    } catch (err: any) {
-      setError(err.message || "เกิดข้อผิดพลาดในการบันทึก");
-    } finally {
-      setLoading(false);
+ const handleSubmit = async (e: FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setError(null);
+
+  try {
+    const payload = { ...formData };
+
+    // แปลงวันที่ว่างให้เป็น null
+    payload.stay_dateout = payload.stay_dateout && payload.stay_dateout !== "" ? payload.stay_dateout : null;
+
+    let res;
+    if (editingStay) {
+      res = await updateStayAction(editingStay.stay_id, payload);
+      // ... update state
+    } else {
+      res = await addStayAction(payload);
+      // ... update state
     }
-  };
+
+    if (res.success) {
+      setShowForm(false);
+      resetForm();
+    } else {
+      throw new Error(res.message);
+    }
+  } catch (err: any) {
+    setError(err.message || "เกิดข้อผิดพลาดในการบันทึก");
+  } finally {
+    setLoading(false);
+  }
+};
+
+  
+// Filter available users/rooms by id
+const availableUsers = users.filter(u =>
+  !stays.some(s => s.user_id === u.user_id && !s.stay_dateout) ||
+  editingStay?.user_id === u.user_id
+);
+
+const availableRooms = rooms.filter(r =>
+  !stays.some(s => s.room_id === r.room_id && !s.stay_dateout) ||
+  editingStay?.room_id === r.room_id
+);
+
+
 
   const getStatusText = (status: number) => {
     switch (status) {
@@ -117,17 +137,6 @@ const StayTable: React.FC<StayTableProps> = ({ initialStays = [], users = [], ro
     }
   };
 
-  const availableUsers = users.filter(u =>
-    !stays.some(s => s.user_name === u.user_name && !s.stay_dateout) ||
-    editingStay?.user_name === u.user_name
-  );
-
-  const availableRooms = rooms.filter(r =>
-    !stays.some(s => s.room_num === r.room_num && !s.stay_dateout) ||
-    editingStay?.room_num === r.room_num
-  );
-
-  // กรอง stay ตาม search
   const filteredStays = stays.filter(s =>
     s.user_name.toLowerCase().includes(search.toLowerCase()) ||
     s.room_num.toLowerCase().includes(search.toLowerCase())
@@ -157,25 +166,54 @@ const StayTable: React.FC<StayTableProps> = ({ initialStays = [], users = [], ro
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2">ผู้ใช้:</label>
-              <select name="user_id" value={formData.user_id} onChange={handleInputChange} required className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                <option value=""> เลือกผู้ใช้ </option>
-                {availableUsers.map(u => <option key={u.user_name} value={u.user_name}>{u.user_name}</option>)}
+              <select
+                name="user_id"
+                value={formData.user_id}
+                onChange={handleInputChange}
+                required
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+              >
+                <option value="">เลือกผู้ใช้</option>
+                {availableUsers.map(u => (
+                  <option key={u.user_id} value={u.user_id}>{u.user_name}</option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2">ห้อง:</label>
-              <select name="room_id" value={formData.room_id} onChange={handleInputChange} required className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                <option value=""> เลือกห้อง </option>
-                {availableRooms.map(r => <option key={r.room_num} value={r.room_num}>{r.room_num}</option>)}
+              <select
+                name="room_id"
+                value={formData.room_id}
+                onChange={handleInputChange}
+                required
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+              >
+                <option value="">เลือกห้อง</option>
+                {availableRooms.map(r => (
+                  <option key={r.room_id} value={r.room_id}>{r.room_num}</option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2">วันที่เข้าพัก:</label>
-              <input type="date" name="stay_date" value={formData.stay_date} onChange={handleInputChange} required className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"/>
+              <input
+                type="date"
+                name="stay_date"
+                value={formData.stay_date}
+                onChange={handleInputChange}
+                required
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+              />
             </div>
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2">สถานะ:</label>
-              <select name="stay_status" value={formData.stay_status} onChange={handleInputChange} required className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+              <select
+                name="stay_status"
+                value={formData.stay_status}
+                onChange={handleInputChange}
+                required
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+              >
                 <option value={0}>เข้าพัก</option>
                 <option value={1}>กำลังเข้าพัก</option>
                 <option value={2}>ย้ายออกแล้ว</option>
@@ -184,14 +222,27 @@ const StayTable: React.FC<StayTableProps> = ({ initialStays = [], users = [], ro
             {editingStay && (
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2">วันที่ย้ายออก:</label>
-                <input type="date" name="stay_dateout" value={formData.stay_dateout || ""} onChange={handleInputChange} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"/>
+                <input
+                  type="date"
+                  name="stay_dateout"
+                  value={formData.stay_dateout || ""}
+                  onChange={handleInputChange}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+                />
               </div>
             )}
             <div className="md:col-span-2 flex justify-end gap-2 mt-4">
-              <button type="submit" className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+              <button
+                type="submit"
+                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+              >
                 {editingStay ? "แก้ไข" : "บันทึก"}
               </button>
-              <button type="button" onClick={() => { setShowForm(false); resetForm(); }} className="bg-gray-400 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); resetForm(); }}
+                className="bg-gray-400 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
+              >
                 ยกเลิก
               </button>
             </div>
@@ -216,22 +267,25 @@ const StayTable: React.FC<StayTableProps> = ({ initialStays = [], users = [], ro
               </tr>
             </thead>
             <tbody className="text-gray-600 text-sm font-light">
-              {filteredStays.slice().sort((a,b)=>a.stay_date.localeCompare(b.stay_date)).map(s => (
-                <tr key={s.stay_id} className="border-b border-gray-200 hover:bg-gray-50">
-                  <td className="py-3 px-6">{s.user_name}</td>
-                  <td className="py-3 px-6">{s.room_num}</td>
-                  <td className="py-3 px-6">{s.stay_date}</td>
-                  <td className="py-3 px-6">{s.stay_dateout || "-"}</td>
-                  <td className="py-3 px-6">{getStatusText(s.stay_status)}</td>
-                  <td className="py-3 px-6 text-center">
-                    <div className="flex items-center justify-center space-x-2">
-                      <button onClick={() => handleEdit(s)} className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-xs">แก้ไข</button>
-                      <button onClick={() => handleDelete(s.stay_id)} className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-xs">ลบ</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+  {filteredStays
+    .slice()
+    .sort((a, b) => Number(a.room_num) - Number(b.room_num))
+    .map(s => (
+      <tr key={s.stay_id} className="border-b border-gray-200 hover:bg-gray-50">
+        <td className="py-3 px-6">{s.user_name}</td>
+        <td className="py-3 px-6">{s.room_num}</td>
+        <td className="py-3 px-6">{s.stay_date}</td>
+        <td className="py-3 px-6">{s.stay_dateout || "-"}</td>
+        <td className="py-3 px-6">{getStatusText(s.stay_status)}</td>
+        <td className="py-3 px-6 text-center">
+          <div className="flex items-center justify-center space-x-2">
+            <button onClick={() => handleEdit(s)} className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-xs">แก้ไข</button>
+            <button onClick={() => handleDelete(s.stay_id)} className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-xs">ลบ</button>
+          </div>
+        </td>
+      </tr>
+  ))}
+</tbody>
           </table>
           {loading && <p className="text-blue-500 text-center mt-4">กำลังโหลด...</p>}
           {error && <p className="text-red-500 text-center mt-4">{error}</p>}
